@@ -15,6 +15,9 @@ networks:
 volumes:
   timescale_data:
   mosquitto_data:
+  # synthetic-data'nin ara ciktisi (households.parquet, ~98 MB). Uretim ve load_to_db
+  # ayri "docker compose run" adimlari oldugu icin konteyner disinda yasamasi sart.
+  synthetic_data_out:
 
 services:
 
@@ -181,10 +184,18 @@ services:
 
   # ---------------- Batch: hane popülasyonu üretimi ----------------
 
+  # Iki adimda calisir, ikisi de ayni volume'u paylasir:
+  #   docker compose --profile batch run --rm synthetic-data                  -> parquet uret
+  #   docker compose --profile batch run --rm synthetic-data load_to_db.py    -> DB'ye yukle
+  # (image'in ENTRYPOINT'i "python", CMD'si "generate_population.py")
   synthetic-data:
     profiles: ["batch"]
     image: ghcr.io/${GH_ORG}/outdoor-airq/synthetic-data:${SYNTHETIC_DATA_SHA}
     networks: [aqi-network]
+    volumes:
+      - synthetic_data_out:/data/generated
+    depends_on:
+      timescaledb: {condition: service_healthy}
     environment:
       DB_HOST: timescaledb
       DB_PORT: "5432"

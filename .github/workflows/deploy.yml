@@ -1,7 +1,13 @@
 name: Deploy (prod)
 
-# core / synthetic-data repolarindaki build workflow'u, image'i GHCR'ye push ettikten
-# sonra buraya repository_dispatch ile sinyal atar. Payload: {"sha": "...", "service": "..."}
+# core / synthetic-data repolarindaki build workflow'u, image'leri GHCR'ye push ettikten
+# sonra buraya repository_dispatch ile sinyal atar.
+# Payload: {"sha": "...", "services": "backend mqtt aqi-flink-job ..."}
+#
+# Servisler TEK dispatch'te toplu gelir cunku hepsi ayni commit'ten dogar. Servis basina
+# ayri dispatch atilsaydi asagidaki concurrency grubu ortadakileri iptal ederdi (GitHub bir
+# grupta yalniz BIR bekleyen calistirma tutar) ve o servislerin *_SHA'si .env'e hic
+# yazilmadan prod karisik image surumleriyle kosardi.
 on:
   repository_dispatch:
     types: [core-image-updated, synthetic-data-image-updated]
@@ -26,19 +32,22 @@ jobs:
             cd /opt/outdoor-airq-infra
 
             SHA="${{ github.event.client_payload.sha }}"
-            SVC="${{ github.event.client_payload.service }}"
+            SERVICES="${{ github.event.client_payload.services }}"
 
-            if [ -z "$SHA" ] || [ -z "$SVC" ]; then
-              echo "payload eksik (sha/service) — elle tetiklenmis olabilir, yalnizca pull+up yapiliyor"
+            if [ -z "$SHA" ] || [ -z "$SERVICES" ]; then
+              echo "payload eksik (sha/services) — elle tetiklenmis olabilir, yalnizca pull+up yapiliyor"
             else
-              # servis adi -> env degiskeni: backend -> BACKEND_SHA, aqi-flink-job -> AQI_FLINK_JOB_SHA
-              VAR="$(echo "$SVC" | tr '[:lower:]-' '[:upper:]_')_SHA"
-              if ! grep -q "^${VAR}=" .env; then
-                echo "HATA: .env icinde ${VAR} tanimli degil" >&2
-                exit 1
-              fi
-              sed -i "s/^${VAR}=.*/${VAR}=${SHA}/" .env
-              echo "${VAR} -> ${SHA}"
+              cp .env ".env.bak.$(date +%s)"
+              for SVC in $SERVICES; do
+                # servis adi -> env degiskeni: backend -> BACKEND_SHA, aqi-flink-job -> AQI_FLINK_JOB_SHA
+                VAR="$(echo "$SVC" | tr '[:lower:]-' '[:upper:]_')_SHA"
+                if ! grep -q "^${VAR}=" .env; then
+                  echo "HATA: .env icinde ${VAR} tanimli degil" >&2
+                  exit 1
+                fi
+                sed -i "s/^${VAR}=.*/${VAR}=${SHA}/" .env
+                echo "${VAR} -> ${SHA}"
+              done
             fi
 
             docker compose -f docker-compose.prod.yml pull
