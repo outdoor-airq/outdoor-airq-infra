@@ -1,0 +1,193 @@
+# outdoor-airq — PROD (AQI-first faz).
+#
+# Host'a HİÇBİR port açılmaz; dış erişim yalnız Cloudflare Tunnel üzerinden.
+# Image tag'leri .env'deki *_SHA değişkenlerinden gelir — "latest" ASLA kullanılmaz,
+# çünkü prod'da hangi kodun çalıştığı belirsizleşir ve rollback imkânsızlaşır.
+#
+# Enerji pipeline'ı Adım 2'ye ait, `profiles` ile varsayılan KAPALI.
+
+name: outdoor-airq
+
+networks:
+  aqi-network:
+    driver: bridge
+
+volumes:
+  timescale_data:
+  mosquitto_data:
+
+services:
+
+  # ---------------- Paylaşılan altyapı ----------------
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: always
+    networks: [aqi-network]
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+    healthcheck:
+      # allow_anonymous kapatılırsa buraya -u/-P eklenmeli
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t healthcheck -m ok -q 0 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    restart: always
+    networks: [aqi-network]
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: aqi_db          # 01_*.sql aqi_db'yi, 02_*.sql energy_demo'yu kurar
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      # KRİTİK: init SQL yalnız BOŞ volume'da çalışır. Mount edilmezse fresh volume'da
+      # şema hiç kurulmaz ve job'lar restart döngüsüne girer.
+      - ./timescaledb-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d aqi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  flink-jobmanager:
+    image: flink:1.19-scala_2.12-java11
+    command: jobmanager
+    restart: always
+    networks: [aqi-network]
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        rest.address: flink-jobmanager
+        rest.port: 8081
+    # 8081 (Web UI) bilerek host'a açılmıyor — ops erişimi SSH port-forward
+    # (ssh -L 8081:localhost:8081) veya Cloudflare Access arkasından.
+
+  flink-taskmanager:
+    image: ghcr.io/${GH_ORG}/outdoor-airq/flink-taskmanager:${FLINK_TASKMANAGER_SHA}
+    command: taskmanager
+    restart: always
+    networks: [aqi-network]
+    depends_on: [flink-jobmanager]
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 2
+      DB_HOST: timescaledb
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+  # ---------------- AQI pipeline (ilk faz — aktif) ----------------
+
+  aqi-flink-job:
+    image: ghcr.io/${GH_ORG}/outdoor-airq/aqi-flink-job:${AQI_FLINK_JOB_SHA}
+    # submit-job.sh idempotenttir: aynı adlı eski job'ı cancel edip yenisini submit eder,
+    # böylece rebuild sonrası cluster eski jar'ı çalıştırmaya devam etmez.
+    command: ["/app/submit-job.sh", "com.aqipipeline.AqiFlinkJob", "/app/aqi-flink-job.jar", "AQI MQTT to TimescaleDB Job"]
+    restart: on-failure
+    networks: [aqi-network]
+    depends_on:
+      mosquitto: {condition: service_started}
+      timescaledb: {condition: service_healthy}
+      flink-jobmanager: {condition: service_started}
+      flink-taskmanager: {condition: service_started}
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      DB_HOST: timescaledb
+      DB_PORT: "5432"
+      DB_NAME: aqi_db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+  aqi-publisher:
+    image: ghcr.io/${GH_ORG}/outdoor-airq/mqtt:${MQTT_SHA}
+    command: ["python", "mqtt/publisher.py"]
+    restart: on-failure
+    networks: [aqi-network]
+    depends_on:
+      mosquitto: {condition: service_started}
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      WAQI_TOKEN: ${WAQI_TOKEN}
+
+  backend:
+    image: ghcr.io/${GH_ORG}/outdoor-airq/backend:${BACKEND_SHA}
+    restart: on-failure
+    networks: [aqi-network]
+    depends_on:
+      timescaledb: {condition: service_healthy}
+    environment:
+      DB_HOST: timescaledb
+      DB_PORT: "5432"
+      DB_NAME: aqi_db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      PORT: "8000"
+      # DİKKAT: backend kodu şu an CORS'u allow_origins=["*"] ile hardcode ediyor.
+      # Bu değişkeni okuması gerekiyor (backlog ISSUE 4), aksi halde prod'da etkisiz.
+      ALLOWED_ORIGINS: "https://app.${DOMAIN}"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/stations').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    # ports: YOK — dış erişim yalnız cloudflared üzerinden
+
+  # ---------------- Tek dış kapı ----------------
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    restart: always
+    networks: [aqi-network]
+    depends_on: [backend]
+    environment:
+      # Zero Trust panelinden alınır; ingress: api.${DOMAIN} -> http://backend:8000
+      TUNNEL_TOKEN: ${CLOUDFLARED_TOKEN}
+
+  # ---------------- Enerji pipeline (Adım 2 — varsayılan KAPALI) ----------------
+
+  energy-flink-job:
+    profiles: ["energy"]
+    image: ghcr.io/${GH_ORG}/outdoor-airq/flink-job:${FLINK_JOB_SHA}
+    command: ["/app/submit-job.sh", "com.energydemo.EnergyStreamJob", "/app/energy-flink-job.jar", "Energy MQTT to TimescaleDB Job"]
+    restart: on-failure
+    networks: [aqi-network]
+    depends_on:
+      timescaledb: {condition: service_healthy}
+      flink-jobmanager: {condition: service_started}
+    environment:
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      DB_HOST: timescaledb
+      DB_PORT: "5432"
+      DB_NAME: energy_demo
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+  energy-publisher:
+    profiles: ["energy"]
+    image: ghcr.io/${GH_ORG}/outdoor-airq/energy-publisher:${ENERGY_PUBLISHER_SHA}
+    restart: on-failure
+    networks: [aqi-network]
+    depends_on:
+      mosquitto: {condition: service_started}
+
+  # ---------------- Batch: hane popülasyonu üretimi ----------------
+
+  synthetic-data:
+    profiles: ["batch"]
+    image: ghcr.io/${GH_ORG}/outdoor-airq/synthetic-data:${SYNTHETIC_DATA_SHA}
+    networks: [aqi-network]
+    environment:
+      DB_HOST: timescaledb
+      DB_PORT: "5432"
+      DB_NAME: energy_demo
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}

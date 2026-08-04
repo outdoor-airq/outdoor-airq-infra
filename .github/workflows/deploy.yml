@@ -1,0 +1,46 @@
+name: Deploy (prod)
+
+# core / synthetic-data repolarindaki build workflow'u, image'i GHCR'ye push ettikten
+# sonra buraya repository_dispatch ile sinyal atar. Payload: {"sha": "...", "service": "..."}
+on:
+  repository_dispatch:
+    types: [core-image-updated, synthetic-data-image-updated]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false      # suren bir rollout'u yarida kesme
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SHA'yi .env'e yaz ve rollout et
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/outdoor-airq-infra
+
+            SHA="${{ github.event.client_payload.sha }}"
+            SVC="${{ github.event.client_payload.service }}"
+
+            if [ -z "$SHA" ] || [ -z "$SVC" ]; then
+              echo "payload eksik (sha/service) — elle tetiklenmis olabilir, yalnizca pull+up yapiliyor"
+            else
+              # servis adi -> env degiskeni: backend -> BACKEND_SHA, aqi-flink-job -> AQI_FLINK_JOB_SHA
+              VAR="$(echo "$SVC" | tr '[:lower:]-' '[:upper:]_')_SHA"
+              if ! grep -q "^${VAR}=" .env; then
+                echo "HATA: .env icinde ${VAR} tanimli degil" >&2
+                exit 1
+              fi
+              sed -i "s/^${VAR}=.*/${VAR}=${SHA}/" .env
+              echo "${VAR} -> ${SHA}"
+            fi
+
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml ps
