@@ -70,7 +70,13 @@ services:
     # (ssh -L 8081:localhost:8081) veya Cloudflare Access arkasından.
 
   flink-taskmanager:
-    image: ghcr.io/${GH_ORG}/outdoor-airq/flink-taskmanager:${FLINK_TASKMANAGER_SHA}
+    # jobmanager gibi upstream image dogrudan kullaniliyor. core'daki
+    # flink-taskmanager/Dockerfile tek satir (FROM flink:...) yani hicbir sey eklemiyor;
+    # GHCR'ye kopyasini itmek ~1 GB ozdes blob tasimak demekti ve ilk tam rebuild'de
+    # GitHub ikincil hiz limitini tetikledi. O Dockerfile'a gercekten bir sey eklenirse
+    # (ornegin ek JDBC surucusu) core workflow'una geri eklenip burasi
+    # ghcr.io/${GH_ORG}/flink-taskmanager:${FLINK_TASKMANAGER_SHA} yapilir.
+    image: flink:1.19-scala_2.12-java11
     command: taskmanager
     restart: always
     networks: [aqi-network]
