@@ -49,21 +49,32 @@ ya da Cloudflare Access arkasında ikinci bir hostname.
 Frontend Cloudflare Pages'te ayrı yaşar (`app.${DOMAIN}`), `VITE_API_URL=https://api.${DOMAIN}`
 **mutlak** adres olmalı ve `public/_redirects` içinde `/* /index.html 200` bulunmalı.
 
+**Firewall:** `cloudflared` yalnızca giden (outbound) bağlantı kurar, hiçbir yeri dinlemez — bu yüzden
+sunucuda 80/443 dahil **hiçbir inbound porta gerek yok**. `ufw` ile yalnız SSH açık bırakılır (mümkünse
+onu da Cloudflare Access / WARP arkasına al).
+
 ## Gerekli secrets
 
 | Nerede | Secret | Ne için |
 |---|---|---|
 | Bu repo → Settings → Secrets → Actions | `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` | Sunucuya SSH ile rollout |
-| `core` ve `synthetic-data` repoları | `INFRA_REPO_PAT` | Buraya `repository_dispatch` (repo scope'lu PAT) |
+| `core` ve `synthetic-data` repoları | `INFRA_REPO_PAT` | Buraya `repository_dispatch` — yalnız `outdoor-airq-infra`'ya `Contents: write` yetkili **fine-grained** PAT (klasik `repo` scope da çalışır ama gereksiz geniş) |
 | Sunucu | `read:packages` PAT | `docker login ghcr.io` (yalnız pull) |
+
+> **⚠️ `INFRA_REPO_PAT` sahibine dikkat:** PAT kişisel bir hesaba bağlıdır. Onu üreten kişi org'dan
+> ayrılır ya da token'ın süresi dolarsa, `core`/`synthetic-data` push'unda infra'ya dispatch **sessizce
+> durur** — üstelik workflow guard'ı yüzünden build **kırmızı yanmaz**, `::warning::` basıp geçer
+> (image'lar GHCR'de hazır kalır, deploy elle yapılır). Kalıcı çözüm: org'a ait bir **GitHub App**
+> (installation token kimseye bağlı değil). En azından ayrılmadan önce PAT'ı yeni sorumluya devret ve
+> eskisini **revoke** et.
 
 ## Bilinen açık işler
 
-Deploy'u bloklamaz ama prod öncesi kapatılmalı — ayrıntı için `deploy-backlog.md`:
+Deploy'u bloklamaz ama prod öncesi kapatılmalı. Her biri bir GitHub Issue:
 
-- Otomatik DB yedeği (`pg_dump` + offsite + restore testi). Şu an tek volume, yedek yok.
-- Monitoring/alerting + backend'e adanmış `/health` endpoint'i.
-- Alembic migration baseline — init SQL yalnız boş volume'da çalışır, şema göçü yolu yok.
-- Backend CORS'u `ALLOWED_ORIGINS` env'inden okumuyor (compose'da tanımlı ama etkisiz).
-- MQTT `allow_anonymous true` — `password_file` ile sertleştirilmeli.
-- VPS boyutu ≥4 vCPU / 8 GB (Flink TaskManager Metaspace OOM geçmişi var).
+- [infra#1](https://github.com/outdoor-airq/outdoor-airq-infra/issues/1) — Otomatik DB yedeği (`pg_dump` + offsite + restore testi). Şu an tek volume, yedek yok.
+- [infra#2](https://github.com/outdoor-airq/outdoor-airq-infra/issues/2) — Monitoring/alerting + backend'e adanmış `/health` endpoint'i.
+- [infra#3](https://github.com/outdoor-airq/outdoor-airq-infra/issues/3) — MQTT `allow_anonymous true` → `password_file` ile sertleştirme.
+- [infra#4](https://github.com/outdoor-airq/outdoor-airq-infra/issues/4) — VPS boyutu ≥4 vCPU / 8 GB (Flink TaskManager Metaspace OOM geçmişi var).
+- [core#1](https://github.com/outdoor-airq/outdoor-airq-core/issues/1) — Backend CORS'u `ALLOWED_ORIGINS` env'inden okumuyor (compose'da tanımlı ama etkisiz).
+- [core#2](https://github.com/outdoor-airq/outdoor-airq-core/issues/2) — Alembic migration baseline; init SQL yalnız boş volume'da çalışır, şema göçü yolu yok.
