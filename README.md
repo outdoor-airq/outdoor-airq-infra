@@ -68,6 +68,12 @@ onu da Cloudflare Access / WARP arkasına al).
 > (installation token kimseye bağlı değil). En azından ayrılmadan önce PAT'ı yeni sorumluya devret ve
 > eskisini **revoke** et.
 
+<!-- Açık anchor: "İzleme" başlığının otomatik slug'ı `i̇zleme-infra2` oluyor — `İ` küçültülünce
+     `i` + U+0307 (birleşik nokta) üretiyor ve GitHub bunu slug'da koruyor. Düz ASCII `i` ile
+     yazılan bağlantı bu id'yi tutturamıyor. Sabit bir id vermek, görünmez bir karakteri
+     bağlantının içine gömmekten sağlam. -->
+<a id="izleme"></a>
+
 ## İzleme (infra#2)
 
 Uygulama stack'inden **ayrı** bir compose dosyası: `monitoring/docker-compose.monitoring.yml`.
@@ -133,7 +139,7 @@ Kimlik bilgileri kişiye/kuruma ait olduğu için bu adım repoda tanımlanamaz,
 Deploy'u bloklamaz ama prod öncesi kapatılmalı. Her biri bir GitHub Issue:
 
 - [infra#1](https://github.com/outdoor-airq/outdoor-airq-infra/issues/1) — Otomatik DB yedeği (`pg_dump` + offsite + restore testi). Şu an tek volume, yedek yok.
-- [infra#2](https://github.com/outdoor-airq/outdoor-airq-infra/issues/2) — Monitoring/alerting. **Kısmen kapandı:** backend `/health` eklendi (`core` d0fefbf) ve Uptime Kuma ayağa kaldırıldı (bkz. [İzleme](#izleme-infra2)). **Kalan:** monitörlerin arayüzden tanımlanması ve bildirim kanalının bağlanması — ikisi de kimlik bilgisi gerektirdiği için elle.
+- [infra#2](https://github.com/outdoor-airq/outdoor-airq-infra/issues/2) — Monitoring/alerting. **Kısmen kapandı:** backend `/health` eklendi (`core` d0fefbf) ve Uptime Kuma ayağa kaldırıldı (bkz. [İzleme](#izleme)). **Kalan:** monitörlerin arayüzden tanımlanması ve bildirim kanalının bağlanması — ikisi de kimlik bilgisi gerektirdiği için elle.
 - [infra#3](https://github.com/outdoor-airq/outdoor-airq-infra/issues/3) — MQTT `allow_anonymous true` → `password_file` ile sertleştirme.
 - [infra#4](https://github.com/outdoor-airq/outdoor-airq-infra/issues/4) — VPS boyutu ≥4 vCPU / 8 GB (Flink TaskManager Metaspace OOM geçmişi var).
 - [core#1](https://github.com/outdoor-airq/outdoor-airq-core/issues/1) — Backend CORS'u `ALLOWED_ORIGINS` env'inden okumuyor (compose'da tanımlı ama etkisiz).
