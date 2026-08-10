@@ -1,0 +1,38 @@
+# outdoor-airq — izleme yığını (infra#2)
+#
+# Uygulama stack'inden AYRI bir compose dosyası. Sebep: izleme, izlediği şeyle birlikte
+# ölmemeli. `docker compose -f docker-compose.prod.yml down` bunu düşürmez; tersi de geçerli.
+#
+# Prob'lar uygulama servislerine SERVİS ADIYLA ulaşır (backend:8000, flink-jobmanager:8081),
+# bu yüzden uygulamanın ağına dışarıdan bağlanıyor. Ağ adı ortama göre değişiyor:
+#   dev  — core/docker-compose.yml        → outdoor-airq-network
+#   prod — infra/docker-compose.prod.yml  → outdoor-airq_aqi-network  (project adı + ağ anahtarı)
+# Varsayılan dev'e göre; prod'da MONITORING_NETWORK ile geçilir.
+
+name: outdoor-airq-monitoring
+
+services:
+  uptime-kuma:
+    # Somut sürüme sabit: bu repo `latest` kullanmama disiplinine sahip (bkz. README, SHA pinleri).
+    # Yükseltme bilinçli bir commit olsun, sessizce gece yarısı gelmesin.
+    image: louislam/uptime-kuma:1.23.17
+    restart: unless-stopped
+    volumes:
+      # Monitör tanımları, olay geçmişi ve bildirim ayarları burada (SQLite). Bu volume
+      # silinirse kurulum sıfırlanır — Uptime Kuma'nın deklaratif config dosyası yoktur.
+      - uptime_kuma_data:/app/data
+    ports:
+      # Host'a açılıyor ama internete DEĞİL: kutuda inbound port yok, dış erişim yalnız
+      # Cloudflare Tunnel üzerinden ve tunnel sadece 8000/8080/8081'i yayınlıyor.
+      # Arayüze erişim Tailscale ile: http://100.90.66.40:3001
+      - "3001:3001"
+    networks:
+      - uygulama-agi
+
+networks:
+  uygulama-agi:
+    external: true
+    name: ${MONITORING_NETWORK:-outdoor-airq-network}
+
+volumes:
+  uptime_kuma_data:

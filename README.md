@@ -68,12 +68,72 @@ onu da Cloudflare Access / WARP arkasına al).
 > (installation token kimseye bağlı değil). En azından ayrılmadan önce PAT'ı yeni sorumluya devret ve
 > eskisini **revoke** et.
 
+## İzleme (infra#2)
+
+Uygulama stack'inden **ayrı** bir compose dosyası: `monitoring/docker-compose.monitoring.yml`.
+İzleme, izlediği şeyle birlikte ölmemeli.
+
+```bash
+cd monitoring
+docker compose -f docker-compose.monitoring.yml up -d          # dev/kutu
+MONITORING_NETWORK=outdoor-airq_aqi-network \
+  docker compose -f docker-compose.monitoring.yml up -d         # prod (ağ adı farklı)
+```
+
+Arayüz `http://<sunucu>:3001` — kutuda Tailscale üzerinden `http://100.90.66.40:3001`.
+İnternete açık değil; Cloudflare Tunnel yalnız 8000/8080/8081'i yayınlıyor.
+
+> **İlk açılışta hemen admin hesabı oluşturun.** Hesap yaratılana kadar kurulum sahipsizdir
+> ve tailnet'teki herhangi biri devralabilir.
+
+### Kurulacak monitörler
+
+Uptime Kuma'nın deklaratif config dosyası **yoktur** — monitörler arayüzden tanımlanır ve
+`uptime_kuma_data` volume'unda (SQLite) saklanır. Bu yüzden aşağıdaki tablo elle uygulanmalı.
+Hepsinde `Retries: 2` önerilir; tek bir başarısız istekte alarm çalmasın.
+
+| Ad | Tip | URL | Aralık | Neyi yakalar |
+|---|---|---|---|---|
+| `backend-health` | HTTP(s) | `http://backend:8000/health` | 60 sn | **Asıl kontrol.** Veri akışı durursa endpoint 503 döner. |
+| `api-public` | HTTP(s) | `https://outdoor-airq-api.arteq.com.tr/health` | 300 sn | Aynı kontrol + Cloudflare Tunnel. Bu kırmızı, `backend-health` yeşilse sorun tunnel'da. |
+| `flink-jobmanager` | HTTP(s) | `http://flink-jobmanager:8081/overview` | 60 sn | JobManager'ın kendisi ayakta mı. |
+| `frontend-public` | HTTP(s) | `https://outdoor-airq.arteq.com.tr` | 300 sn | Vitrin sayfası servis ediliyor mu. |
+
+**Neden `/health` asıl kontrol:** "servis ayakta mı" sormak yetmiyor — bu projede kayıtlı iki
+sessiz ölüm vakasında da servisler ayaktaydı, job `RUNNING` görünüyordu ve dashboard eski
+satırlarla **dolu** duruyordu. `/health` son kaydın yaşını döndürür ve eşiği aşınca 503 verir,
+yani Uptime Kuma tarafında ekstra kural yazmaya gerek yok: "200 değilse alarm" yeterli.
+Eşik varsayılan 3 saat, `HEALTH_STALE_SECONDS` ile değiştirilebilir (gerekçesi
+`core/backend/app/services/health.py` içinde).
+
+İsteğe bağlı, daha keskin bir Flink kontrolü — JobManager ayakta ama AQI job'ı düşmüş olabilir.
+Uptime Kuma "HTTP(s) - Json Query" tipiyle, `http://flink-jobmanager:8081/jobs/overview`
+üzerinde jsonata ifadesi:
+
+```
+jobs[name="AQI MQTT to TimescaleDB Job" and state="RUNNING"].state
+```
+
+beklenen değer `RUNNING`. (Endpoint'in bu alanları döndürdüğü doğrulandı; ifadenin Uptime Kuma
+arayüzündeki davranışı test edilmedi, eklerken bir kez elle deneyin.)
+
+### Bildirim
+
+Settings → Notifications → Setup Notification. **Default enabled** işaretlenirse bütün
+monitörlere uygulanır.
+
+- **Telegram** (en hızlısı): @BotFather → `/newbot` → token; bota bir mesaj atıp Uptime
+  Kuma'daki "Get chat ID" düğmesiyle chat id alınır.
+- **E-posta (SMTP)**: SMTP sunucu/port/kullanıcı/parola gerekir.
+
+Kimlik bilgileri kişiye/kuruma ait olduğu için bu adım repoda tanımlanamaz, arayüzden yapılır.
+
 ## Bilinen açık işler
 
 Deploy'u bloklamaz ama prod öncesi kapatılmalı. Her biri bir GitHub Issue:
 
 - [infra#1](https://github.com/outdoor-airq/outdoor-airq-infra/issues/1) — Otomatik DB yedeği (`pg_dump` + offsite + restore testi). Şu an tek volume, yedek yok.
-- [infra#2](https://github.com/outdoor-airq/outdoor-airq-infra/issues/2) — Monitoring/alerting + backend'e adanmış `/health` endpoint'i.
+- [infra#2](https://github.com/outdoor-airq/outdoor-airq-infra/issues/2) — Monitoring/alerting. **Kısmen kapandı:** backend `/health` eklendi (`core` d0fefbf) ve Uptime Kuma ayağa kaldırıldı (bkz. [İzleme](#izleme-infra2)). **Kalan:** monitörlerin arayüzden tanımlanması ve bildirim kanalının bağlanması — ikisi de kimlik bilgisi gerektirdiği için elle.
 - [infra#3](https://github.com/outdoor-airq/outdoor-airq-infra/issues/3) — MQTT `allow_anonymous true` → `password_file` ile sertleştirme.
 - [infra#4](https://github.com/outdoor-airq/outdoor-airq-infra/issues/4) — VPS boyutu ≥4 vCPU / 8 GB (Flink TaskManager Metaspace OOM geçmişi var).
 - [core#1](https://github.com/outdoor-airq/outdoor-airq-core/issues/1) — Backend CORS'u `ALLOWED_ORIGINS` env'inden okumuyor (compose'da tanımlı ama etkisiz).
