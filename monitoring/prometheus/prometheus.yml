@@ -1,0 +1,24 @@
+# Prometheus "pull" modeliyle çalışır: servislere gidip metrik ÇEKER, servisler ona
+# göndermez. Her hedefin `/metrics` yolunda düz metin formatında sayılar sunması gerekir.
+#
+# Şu an yalnızca makine metrikleri toplanıyor (node-exporter). Uygulamanın kendi metrikleri
+# (Flink operatör sayaçları, FastAPI istek süreleri) burada YOK — onlar için uygulama
+# tarafında değişiklik gerekir, bilinçli olarak kapsam dışı bırakıldı:
+#   Flink   -> FLINK_PROPERTIES'e PrometheusReporter eklenmeli (core compose değişir)
+#   FastAPI -> prometheus-fastapi-instrumentator kütüphanesi (core koduna bağımlılık)
+# İkisi de ayrı birer iş; eklenirse buraya birer scrape_config satırı gelir.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus'un kendisi de metrik yayınlar (kaç hedef topluyor, ne kadar sürüyor).
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Makine: CPU, RAM, disk, ağ, load average.
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]

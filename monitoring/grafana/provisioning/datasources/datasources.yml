@@ -1,0 +1,29 @@
+# Grafana veri kaynakları — dosyadan geliyor, arayüzden tanımlanmıyor.
+# $DB_USER / $DB_PASSWORD compose'daki environment'tan gelir (monitoring/.env).
+
+apiVersion: 1
+
+datasources:
+  # Uygulamanın kendi verisi. TimescaleDB düz PostgreSQL olduğu için Grafana'nın
+  # postgres sürücüsü doğrudan çalışıyor — arada exporter yok, veri kopyalanmıyor,
+  # Grafana canlı tabloya SQL sorusu soruyor.
+  - name: TimescaleDB
+    uid: timescaledb
+    type: postgres
+    url: timescaledb:5432
+    database: aqi_db
+    user: $DB_USER
+    isDefault: true
+    secureJsonData:
+      password: $DB_PASSWORD
+    jsonData:
+      sslmode: disable          # aynı docker ağı, dışarı çıkmıyor
+      postgresVersion: 1600     # PG 16
+      timescaledb: true         # time_bucket() gibi fonksiyonları tanısın
+
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    url: http://prometheus:9090
+    jsonData:
+      httpMethod: POST

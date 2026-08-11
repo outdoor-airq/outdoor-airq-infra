@@ -1,0 +1,91 @@
+# outdoor-airq — metrik ve görselleştirme yığını
+#
+# `docker-compose.monitoring.yml` (Uptime Kuma) ile AYRI tutuluyor. Sebep: ikisi farklı
+# soruları cevaplıyor ve birbirinden bağımsız açılıp kapanmaları gerekiyor.
+#   Uptime Kuma  -> "ayakta mı?"   (evet/hayır, alarm için)
+#   bu dosya     -> "ne kadar?"    (sayılar, eğilim, inceleme için)
+# Aynı dosyada olsalardı `up -d` biri istenmediğinde diğerini de kaldırırdı.
+#
+# İki veri kaynağı, iki ayrı iş:
+#   TimescaleDB -> uygulamanın KENDİ verisi (AQI ölçümleri, anomaliler)
+#   Prometheus  -> makinenin durumu (CPU, RAM, disk)
+#
+# Uygulama koduna hiç dokunmuyor: ne core'a bir kütüphane ekleniyor, ne Flink config'i
+# değişiyor. Flink ve FastAPI'nin kendi metriklerini toplamak ayrı ve daha invaziv bir iş.
+
+name: outdoor-airq-metrics
+
+services:
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?monitoring/.env icinde tanimlanmali}
+      # Provisioning dosyalari bu iki degiskeni $DB_USER / $DB_PASSWORD olarak kullaniyor.
+      DB_USER: ${DB_USER:?monitoring/.env icinde tanimlanmali}
+      DB_PASSWORD: ${DB_PASSWORD:?monitoring/.env icinde tanimlanmali}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      # Uptime Kuma'nın aksine Grafana DEKLARATİF kurulabiliyor: veri kaynakları ve
+      # dashboard'lar dosyadan geliyor, arayüzden tıklamaya gerek yok. Bu yüzden
+      # kurulumun tamamı git'te ve yeniden üretilebilir.
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      # Tailscale üzerinden: http://100.90.66.40:3000
+      - "3000:3000"
+    networks:
+      - uygulama-agi
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      # 15 gün yeterli: bu bir öğrenme/inceleme kurulumu, uzun dönem arşiv değil.
+      # Sınırsız bırakılırsa disk sessizce dolar.
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      # Kendi arayüzü de var; PromQL denemek için kullanışlı.
+      - "9090:9090"
+    networks:
+      - uygulama-agi
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    restart: unless-stopped
+    command:
+      # Bu kutu bir Proxmox LXC container'i. Uc bayrak da SART, aksi halde yanlis
+      # makineyi olcer:
+      #   --path.rootfs  -> yalnizca dosya sistemi toplayicisini etkiler
+      #   --path.procfs  -> bellek, CPU, load buradan okunur
+      #   --path.sysfs   -> donanim/blok cihaz bilgisi
+      # Yalniz rootfs verilirse bellek ve CPU container'in KENDI /proc'undan gelir; o da
+      # lxcfs'in sanallastirmasini gormedigi icin Proxmox ana makinesinin degerlerini
+      # basar (olculdu: 148 GB, oysa bu kutuda 8 GB var). /host/proc ise lxcfs'in
+      # sanallastirdigi gercek limitleri gosteriyor.
+      - "--path.rootfs=/host"
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+    volumes:
+      - /:/host:ro,rslave
+    # Port yayınlanmıyor: yalnızca Prometheus ona ağ üzerinden ulaşıyor.
+    networks:
+      - uygulama-agi
+
+networks:
+  uygulama-agi:
+    external: true
+    name: ${MONITORING_NETWORK:-outdoor-airq-network}
+
+volumes:
+  grafana_data:
+  prometheus_data:

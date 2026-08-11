@@ -134,6 +134,71 @@ monitörlere uygulanır.
 
 Kimlik bilgileri kişiye/kuruma ait olduğu için bu adım repoda tanımlanamaz, arayüzden yapılır.
 
+## Metrik ve görselleştirme (Grafana + Prometheus)
+
+`monitoring/docker-compose.metrics.yml` — Uptime Kuma'dan **ayrı** dosya, çünkü farklı soruyu
+cevaplıyorlar ve bağımsız açılıp kapanmaları gerekiyor:
+
+| | Sorusu | Çıktısı |
+|---|---|---|
+| Uptime Kuma | "ayakta mı?" | evet/hayır, alarm |
+| bu yığın | "ne kadar?" | sayılar, eğilim, inceleme |
+
+```bash
+cd monitoring
+cp .env.example .env && chmod 600 .env    # doldur (aşağıya bak)
+docker compose -f docker-compose.metrics.yml up -d
+```
+
+`monitoring/.env` **zorunlu**, yoksa compose açılmaz (değişkenler `:?` ile korumalı):
+
+| Değişken | Ne |
+|---|---|
+| `DB_USER`, `DB_PASSWORD` | Grafana'nın TimescaleDB'ye bağlanması için. `core/.env` ile **aynı** değerler. |
+| `GRAFANA_USER`, `GRAFANA_PASSWORD` | Grafana arayüz girişi |
+
+> `GF_SECURITY_ADMIN_PASSWORD` yalnızca **ilk açılışta** uygulanır; sonrasında parola Grafana'nın
+> kendi veritabanında yaşar. Sonradan değiştirmek için:
+> `docker compose -f docker-compose.metrics.yml exec grafana grafana cli admin reset-admin-password <yeni>`
+
+Arayüzler Tailscale üzerinden: Grafana `:3000`, Prometheus `:9090`. İnternete açık değil.
+
+**Grafana deklaratif kuruluyor** — Uptime Kuma'dan en büyük farkı bu. Veri kaynakları
+(`grafana/provisioning/`) ve dashboard'lar (`grafana/dashboards/*.json`) dosyadan geliyor, arayüzden
+tıklamaya gerek yok; kurulumun tamamı git'te ve yeniden üretilebilir.
+
+İki dashboard hazır gelir:
+- **outdoor-airq — Veri**: doğrudan TimescaleDB'den. Son verinin yaşı, istasyon/ölçüm/anomali
+  sayaçları, istasyon bazında AQI zaman serisi, son ölçümler tablosu. Arada exporter yok —
+  TimescaleDB düz PostgreSQL olduğu için Grafana canlı tabloya SQL soruyor.
+- **outdoor-airq — Makine**: Prometheus + node-exporter.
+
+### ⚠️ Makine metrikleri: neyi ölçtüğüne dikkat
+
+Kurulum üç katmanlı: **Docker → Proxmox LXC (bu kutu) → Proxmox ana makinesi.** `lxcfs`,
+`/proc/meminfo` gibi dosyaları **okuyan sürecin cgroup'una göre** üretir. Sonuç:
+
+| Metrik | Kapsamı | Güvenilir mi |
+|---|---|---|
+| Disk | bu kutu | ✅ gerçek dosya sistemi okunuyor, `df -h` ile doğrulandı |
+| Bellek | node-exporter'ın kendi container'ı | ❌ ölçüldü: "7.99 GB boş" derken kutunun gerçeği 3.4 GB'tı |
+| CPU / yük | Proxmox ana makinesinin tamamı | ❌ yük 6.17 görünürken kutudaki container'ların toplamı %4'tü |
+
+Bayraklar (`--path.procfs`, `--path.sysfs`) eklendiğinde bellek **toplamı** ve CPU **sayısı**
+doğruya oturuyor, ama cgroup kaynaklı sapma bayrakla çözülmüyor — node-exporter'ın LXC'nin kök
+cgroup'unda çalışması gerekirdi, Docker içinden mümkün değil.
+
+Panel başlıklarında kapsam açıkça yazılı ve dashboard'un başında uyarı paneli var. Kutunun gerçek
+bellek/CPU durumu için `free -h` ve `docker stats`.
+
+### Kapsam dışı bırakılanlar
+
+Uygulamanın **kendi** metrikleri toplanmıyor; ikisi de core'da değişiklik gerektirir:
+- **Flink** operatör sayaçları → `FLINK_PROPERTIES`'e PrometheusReporter eklenmeli (core compose değişir)
+- **FastAPI** istek süreleri → `prometheus-fastapi-instrumentator` bağımlılığı
+
+Eklenirlerse `prometheus/prometheus.yml`'ye birer `scrape_config` satırı gelir.
+
 ## Bilinen açık işler
 
 Deploy'u bloklamaz ama prod öncesi kapatılmalı. Her biri bir GitHub Issue:

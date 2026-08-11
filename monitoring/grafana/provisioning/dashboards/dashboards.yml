@@ -1,0 +1,18 @@
+# Dashboard'lar da dosyadan yükleniyor. /var/lib/grafana/dashboards altındaki JSON'lar
+# Grafana açılışında otomatik içeri alınır ve dosya değişince yeniden okunur.
+
+apiVersion: 1
+
+providers:
+  - name: outdoor-airq
+    orgId: 1
+    folder: outdoor-airq
+    type: file
+    disableDeletion: false
+    # Arayüzden yapılan düzenlemeler dosyaya YAZILMAZ; kalıcı olmasını istediğin
+    # değişikliği dashboard'u JSON olarak export edip bu klasöre koyarak yap.
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
