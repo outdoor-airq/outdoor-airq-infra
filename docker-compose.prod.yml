@@ -124,6 +124,8 @@ services:
       MQTT_BROKER: mosquitto
       MQTT_PORT: "1883"
       WAQI_TOKEN: ${WAQI_TOKEN}
+      # Istasyon kesfinin cografi siniri (bkz. core/mqtt/publisher.py).
+      WAQI_BOUNDS: ${WAQI_BOUNDS:-}
 
   backend:
     image: ghcr.io/${GH_ORG}/outdoor-airq/backend:${BACKEND_SHA}
