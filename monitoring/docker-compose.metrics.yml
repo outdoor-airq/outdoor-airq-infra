@@ -22,9 +22,11 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?monitoring/.env icinde tanimlanmali}
-      # Provisioning dosyalari bu iki degiskeni $DB_USER / $DB_PASSWORD olarak kullaniyor.
-      DB_USER: ${DB_USER:?monitoring/.env icinde tanimlanmali}
-      DB_PASSWORD: ${DB_PASSWORD:?monitoring/.env icinde tanimlanmali}
+      # Provisioning dosyalari bunlari $GRAFANA_DB_USER / $GRAFANA_DB_PASSWORD olarak
+      # kullaniyor. Veritabani SAHIBI degil, salt okunur rol -- gerekcesi
+      # grafana/provisioning/datasources/datasources.yml basinda yazili.
+      GRAFANA_DB_USER: ${GRAFANA_DB_USER:?monitoring/.env icinde tanimlanmali}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:?monitoring/.env icinde tanimlanmali}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       # Uptime Kuma'nın aksine Grafana DEKLARATİF kurulabiliyor: veri kaynakları ve

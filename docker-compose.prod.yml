@@ -138,11 +138,17 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       PORT: "8000"
-      # DİKKAT: backend kodu şu an CORS'u allow_origins=["*"] ile hardcode ediyor.
-      # Bu değişkeni okuması gerekiyor (backlog ISSUE 4), aksi halde prod'da etkisiz.
-      ALLOWED_ORIGINS: "https://app.${DOMAIN}"
+      # Backend bu değişkeni artık GERÇEKTEN okuyor (core#1, commit a2e6000). Yani yanlış
+      # değer eskisi gibi sessizce etkisiz kalmaz, frontend'in bütün isteklerini bloklar.
+      # Hostname düz/tek seviye: Universal SSL yalnız `*.${DOMAIN}` kapsıyor,
+      # `app.outdoor-airq.${DOMAIN}` gibi iki seviyeli ad ücretsiz sertifika ALMIYOR
+      # (bkz. dokuman/CLOUDFLARE-KURULUM.md — kurulumda bu yüzden düz isim seçilmiş).
+      ALLOWED_ORIGINS: "https://outdoor-airq.${DOMAIN}"
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/stations').status==200 else 1)\""]
+      # /stations DEĞİL /health: /stations veri bayat olsa da 200 döner, yani yalnızca
+      # "servis ayakta mı" sorusunu cevaplar. /health veri akışı durunca 503 döndüğü için
+      # bu healthcheck artık sessiz ölümü de yakalıyor — zaten onun için yazıldı (infra#2).
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)\""]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -157,7 +163,8 @@ services:
     networks: [aqi-network]
     depends_on: [backend]
     environment:
-      # Zero Trust panelinden alınır; ingress: api.${DOMAIN} -> http://backend:8000
+      # Zero Trust panelinden alınır; ingress: outdoor-airq-api.${DOMAIN} -> http://backend:8000
+      # (düz/tek seviye hostname, sertifika gerekçesi için bkz. ALLOWED_ORIGINS notu)
       TUNNEL_TOKEN: ${CLOUDFLARED_TOKEN}
 
   # ---------------- Enerji pipeline (Adım 2 — varsayılan KAPALI) ----------------

@@ -13,7 +13,7 @@
       "id": 1,
       "type": "stat",
       "title": "Son verinin yasi",
-      "description": "max(measured_at) ile simdi arasindaki fark. Esikler backend /health ile ayni mantikta: 3 saati asarsa akis durmus sayilir.",
+      "description": "max(measured_at) ile simdi arasindaki fark. Esikler backend /health ile ayni mantikta: 3 saati asarsa akis durmus sayilir. COALESCE(...,99999) SART: bos tabloda max() NULL doner, NULL yayilir ve panel 'No data' gosterip taban rengi olan YESILDE kalirdi -- yani /health 503 derken bu panel saglikli gorunurdu. WHERE measured_at <= now() de /health ile ayni gerekce: saati ileri kaymis tek istasyon yasi sifirlar.",
       "datasource": { "type": "postgres", "uid": "timescaledb" },
       "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
       "targets": [
@@ -21,7 +21,7 @@
           "refId": "A",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT round(EXTRACT(EPOCH FROM (now() - max(measured_at)))/60) AS \"dakika\" FROM raw_readings"
+          "rawSql": "SELECT COALESCE(round(EXTRACT(EPOCH FROM (now() - max(measured_at)))/60), 99999) AS \"dakika\" FROM raw_readings WHERE measured_at <= now()"
         }
       ],
       "fieldConfig": {
@@ -174,7 +174,8 @@
     {
       "id": 6,
       "type": "table",
-      "title": "Her istasyonun son olcumu",
+      "title": "Her istasyonun son olcumu (son 7 gun)",
+      "description": "7 gunluk pencere SART: zaman kosulu olmadan DISTINCT ON tum hypertable'i tarayip global siralama yapar ve panel 1 dakikada bir kosar. Tablo surekli buyudugu icin (SIM backfill'iyle 118 bin satiri gecti) sinirsiz sorgu zamanla agirlasir. 7 gun, en uzun makul veri kesintisini bile kapsar.",
       "datasource": { "type": "postgres", "uid": "timescaledb" },
       "gridPos": { "h": 11, "w": 24, "x": 0, "y": 15 },
       "targets": [
@@ -182,7 +183,7 @@
           "refId": "A",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT DISTINCT ON (station_id) station_name AS \"Istasyon\", aqi AS \"AQI\", dominant AS \"Baskin kirletici\", pm25 AS \"PM2.5\", pm10 AS \"PM10\", temperature AS \"Sicaklik\", measured_at AS \"Olcum\" FROM raw_readings ORDER BY station_id, measured_at DESC"
+          "rawSql": "SELECT DISTINCT ON (station_id) station_name AS \"Istasyon\", aqi AS \"AQI\", dominant AS \"Baskin kirletici\", pm25 AS \"PM2.5\", pm10 AS \"PM10\", temperature AS \"Sicaklik\", measured_at AS \"Olcum\" FROM raw_readings WHERE measured_at > now() - interval '7 days' AND measured_at <= now() ORDER BY station_id, measured_at DESC"
         }
       ],
       "fieldConfig": {

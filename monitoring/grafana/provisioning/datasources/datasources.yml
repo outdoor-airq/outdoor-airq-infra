@@ -1,5 +1,11 @@
 # Grafana veri kaynakları — dosyadan geliyor, arayüzden tanımlanmıyor.
-# $DB_USER / $DB_PASSWORD compose'daki environment'tan gelir (monitoring/.env).
+# $GRAFANA_DB_USER / $GRAFANA_DB_PASSWORD compose'daki environment'tan gelir (monitoring/.env).
+#
+# DİKKAT: Bu kullanıcı veritabanı SAHİBİ DEĞİL, salt okunur bir roldür. Sebebi: Grafana'da
+# Editor/Admin yetkisi olan herkes Explore ekranından SERBEST SQL çalıştırabilir. Sahip
+# kullanıcıyla bağlansaydı bir Grafana girişi `DROP TABLE raw_readings` yetkisi demek olurdu —
+# yani panolar için verilen bir parola, üretim verisini silme yetkisine dönüşürdü.
+# Rol doğrulandı: SELECT çalışıyor, DROP "must be owner of table" ile reddediliyor.
 
 apiVersion: 1
 
@@ -12,10 +18,10 @@ datasources:
     type: postgres
     url: timescaledb:5432
     database: aqi_db
-    user: $DB_USER
+    user: $GRAFANA_DB_USER
     isDefault: true
     secureJsonData:
-      password: $DB_PASSWORD
+      password: $GRAFANA_DB_PASSWORD
     jsonData:
       sslmode: disable          # aynı docker ağı, dışarı çıkmıyor
       postgresVersion: 1600     # PG 16

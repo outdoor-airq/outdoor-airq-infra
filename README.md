@@ -86,8 +86,12 @@ MONITORING_NETWORK=outdoor-airq_aqi-network \
   docker compose -f docker-compose.monitoring.yml up -d         # prod (ağ adı farklı)
 ```
 
-Arayüz `http://<sunucu>:3001` — kutuda Tailscale üzerinden `http://100.90.66.40:3001`.
-İnternete açık değil; Cloudflare Tunnel yalnız 8000/8080/8081'i yayınlıyor.
+Arayüz `http://<sunucu>:3001` — kutuda `http://100.90.66.40:3001`.
+
+**Erişim kapsamı:** port `0.0.0.0`'a bağlanıyor, yani hem Tailscale adresinden hem yerel
+ağdan (`192.168.0.64`) erişilebilir. **İnternete açık değil** — Cloudflare Tunnel yalnız
+8000/8080/8081'i yayınlıyor ve kutuda inbound port yok. Aynı durum diğer servisler için de
+geçerli (5432, 1883, 5173), yani bu bir istisna değil kurulumun genel deseni.
 
 > **İlk açılışta hemen admin hesabı oluşturun.** Hesap yaratılana kadar kurulum sahipsizdir
 > ve tailnet'teki herhangi biri devralabilir.
@@ -161,7 +165,15 @@ docker compose -f docker-compose.metrics.yml up -d
 > kendi veritabanında yaşar. Sonradan değiştirmek için:
 > `docker compose -f docker-compose.metrics.yml exec grafana grafana cli admin reset-admin-password <yeni>`
 
-Arayüzler Tailscale üzerinden: Grafana `:3000`, Prometheus `:9090`. İnternete açık değil.
+Arayüzler: Grafana `:3000`, Prometheus `:9090`. İnternete açık değil, ama portlar
+`0.0.0.0`'a bağlı olduğu için Tailscale'in yanı sıra yerel ağdan da erişilebilirler
+(bkz. yukarıdaki "Erişim kapsamı" notu).
+
+> **Prometheus'un kimlik doğrulaması YOKTUR.** Grafana ve Uptime Kuma'nın en azından girişi
+> var, Prometheus'un yok — `:9090`'a ulaşan herkes bütün makine metriklerini okuyabilir.
+> Tailnet + LAN ile sınırlı olduğu için kabul edildi; daha sıkı isteniyorsa compose'daki
+> port satırı `"127.0.0.1:9090:9090"` yapılıp arayüze yalnız SSH port-forward ile erişilir
+> (Grafana ona ağ üzerinden ulaştığı için panolar bundan etkilenmez).
 
 **Grafana deklaratif kuruluyor** — Uptime Kuma'dan en büyük farkı bu. Veri kaynakları
 (`grafana/provisioning/`) ve dashboard'lar (`grafana/dashboards/*.json`) dosyadan geliyor, arayüzden
@@ -204,7 +216,7 @@ Eklenirlerse `prometheus/prometheus.yml`'ye birer `scrape_config` satırı gelir
 Deploy'u bloklamaz ama prod öncesi kapatılmalı. Her biri bir GitHub Issue:
 
 - [infra#1](https://github.com/outdoor-airq/outdoor-airq-infra/issues/1) — Otomatik DB yedeği (`pg_dump` + offsite + restore testi). Şu an tek volume, yedek yok.
-- [infra#2](https://github.com/outdoor-airq/outdoor-airq-infra/issues/2) — Monitoring/alerting. **Kısmen kapandı:** backend `/health` eklendi (`core` d0fefbf) ve Uptime Kuma ayağa kaldırıldı (bkz. [İzleme](#izleme)). **Kalan:** monitörlerin arayüzden tanımlanması ve bildirim kanalının bağlanması — ikisi de kimlik bilgisi gerektirdiği için elle.
+- [infra#2](https://github.com/outdoor-airq/outdoor-airq-infra/issues/2) — Monitoring/alerting. **Kısmen kapandı:** backend `/health` eklendi (`core` d0fefbf) ve izleme yığınları tanımlandı (bkz. [İzleme](#izleme)). **Uptime Kuma şu an ÇALIŞMIYOR** — bildirim kanalı istenmediği için, sahipsiz bir kurulumun tailnet'e açık kalmaması adına başlatılmadan bırakıldı. **Kalan:** monitörlerin tanımlanması ve bildirim kanalının bağlanması; ikisi de kimlik bilgisi gerektirdiği için elle yapılacak. Yani şu an alarm zinciri kurulu değil, elde yalnız sorulduğunda cevap veren `/health` ve Grafana panoları var.
 - [infra#3](https://github.com/outdoor-airq/outdoor-airq-infra/issues/3) — MQTT `allow_anonymous true` → `password_file` ile sertleştirme.
 - [infra#4](https://github.com/outdoor-airq/outdoor-airq-infra/issues/4) — VPS boyutu ≥4 vCPU / 8 GB (Flink TaskManager Metaspace OOM geçmişi var).
 - [core#1](https://github.com/outdoor-airq/outdoor-airq-core/issues/1) — Backend CORS'u `ALLOWED_ORIGINS` env'inden okumuyor (compose'da tanımlı ama etkisiz).
