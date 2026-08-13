@@ -211,6 +211,69 @@ Uygulamanın **kendi** metrikleri toplanmıyor; ikisi de core'da değişiklik ge
 
 Eklenirlerse `prometheus/prometheus.yml`'ye birer `scrape_config` satırı gelir.
 
+## Yedek (infra#1 — kısmen)
+
+`backup/yedek-al.sh` günlük dump alır, `backup/yedek-dogrula.sh` yedeği **gerçekten geri
+yükleyerek** doğrular. İkisi de kutuda cron'a bağlı (günlük 03:00, doğrulama pazar 04:00).
+
+| Ne | Nereye | Boyut |
+|---|---|---|
+| `aqi_db` (tamamı) | `/work/ortak/yedek/aqi_db-<damga>.dump` | ~8 MB |
+| `energy_demo` (`households_marmara` verisi hariç) | `energy_demo-<damga>.dump` | ~11 MB |
+| `households_marmara` (statik, tek sefer) | `households_marmara.dump` | ~108 MB |
+
+**Neden `households_marmara` günlük alınmıyor:** 2283 MB, yani `energy_demo`'nun %94'ü, ve
+zaman serisi değil — 8.529.528 satırlık statik bir üretim çıktısı. `outdoor-airq-synthetic-data`
+deposundan deterministik üretilebiliyor (`SEED=20260727` git'te sabit, TÜİK girdileri git'te,
+`src/validate.py` #11 iki kez üretip sha256 karşılaştırıyor). Yine de **bir kopyası tutuluyor**:
+yeniden üretilebilirlik canlı bir bağımlılık (üretim hattının çalışır kalması gerekir), dump ise
+atıl bir dosya — kurtarma baskı altında tek komut olsun diye.
+
+**Neden `aqi_db`'nin tamamı:** bu sistemdeki tek telafisi olmayan veri. WAQI geçmişe dönük
+ölçüm **vermiyor** (denendi: `date`, `from/to`, `history` parametrelerinin üçü de yalnız anlık
+değeri döndürüyor). Kaydedilmeyen an bir daha elde edilemez.
+
+### ⚠️ Şu an OFFSITE YOK
+
+Dosyalar veritabanıyla **aynı diskte**. `docker compose down -v` ve volume silinmesine karşı
+korur — ki `core#2` (Alembic yok) yüzünden şema değiştirmenin belgelenmiş tek yolu o komuttur,
+yani en olası kayıp senaryosu budur. **Disk/host kaybına karşı korumaz.**
+
+Tamamlamak için tek gereken bir bulut anahtarı:
+
+```bash
+~/.local/bin/rclone config          # b2 / s3 uzağı tanımla, ör. adı "b2"
+export YEDEK_UZAK=b2:outdoor-airq-yedek   # cron ortamına da eklenmeli
+```
+
+`YEDEK_UZAK` tanımsızken betik **gürültülü uyarı** basar: "yedek var" sanıp aynı diskte durmak,
+hiç yedek olmamasından tehlikelidir.
+
+### Doğrulama tabanı canlı DB değil, `.meta` sidecar
+
+Her dump'ın yanına `<dump>.meta` yazılıyor: dump'tan **hemen önceki ve hemen sonraki** satır
+sayısı, artı hypertable sayısı. Doğrulama bu aralığa bakıyor.
+
+Canlı DB'den okunsaydı **her hafta yanlış alarm** verirdi: cron'da dump 03:00'te, doğrulama
+04:00'te çalışıyor ve arada `raw_readings`'e ~88 satır giriyor. Haftada bir "YEDEK BOZUK" diyen
+bir kontrol birkaç hafta içinde göz ardı edilir — sessiz bozukluk riskini kapatmak için yazılan
+şey gürültüyle aynı yere çıkar.
+
+Tek sayı değil **aralık**, çünkü `pg_dump` başlangıçta bir anlık görüntü alıyor ve o görüntünün
+tam olarak hangi satırları içerdiği dışarıdan bilinemiyor. Gerçek: ilk çalıştırmada `energy_demo`
+için `862697..862714` yazıldı (dump sürerken 17 satır girmiş) ve geri yüklenen değer aralığın alt
+ucu çıktı.
+
+### Doğrulama neden `pg_restore` çıkış koduna bakmıyor
+
+Bakmıyor çünkü güvenilmez — kurulum sırasında bir kez `pg_restore` **çıkış kodu 0** döndürdü
+ama `errors ignored on restore: 816` ile veri hiç gelmedi. Betik bunun yerine kaynakla geri
+yüklenen arasında **satır sayısı ve hypertable listesi** karşılaştırıyor.
+
+Ayrıca TimescaleDB'ye özel: düz `pg_restore` çalışır gibi görünür ama hypertable'lar sessizce
+düz tabloya döner. Doğru sıra `timescaledb_pre_restore()` → `pg_restore` →
+`timescaledb_post_restore()` ve betik sonucu ayrıca doğruluyor.
+
 ## Bilinen açık işler
 
 Deploy'u bloklamaz ama prod öncesi kapatılmalı. Her biri bir GitHub Issue:
