@@ -8,7 +8,7 @@
   ],
   "timezone": "Europe/Istanbul",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 6,
   "refresh": "1m",
   "time": {
     "from": "now-24h",
@@ -436,6 +436,374 @@
           "mode": "single"
         }
       }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Verinin gelme suresi — medyan (son 24 sa)",
+      "description": "Istasyonun olcum damgasi (measured_at) ile satirin BIZIM tabloya dustugu an (ingested_at) arasindaki fark. Zincirin tamami buna dahil: WAQI'nin kendi yayinlama gecikmesi + publisher'in 5 dakikalik cekim araligi + MQTT + Flink. BU PANEL ISLENME SURESI DEGILDIR -- zincirin paylari OLCULDU (18.08):\n  WAQI'nin kendi yayinlama gecikmesi : ~40 dk'lik medyanin neredeyse tamami. Dogrudan API'ye soruldu, bizim hattimiz devre disiyken WAQI'nin verisi 60,8 dk bayatti.\n  publisher cekim araligi            : 0-5 dk (POLL_SECONDS=300)\n  MQTT + Flink + veritabanina yazma  : 0,0 sn. Publisher'in yayin log damgasi ile ingested_at ayni saniye cikti (6 istasyonda tekrarlandi).\nYani panel 'bizim hattimiz yavas mi' degil 'elimizdeki veri ne kadar bayat' sorusunu olcuyor; yuksek deger gorunce once WAQI'ye bakilir, hatta degil.\\n\\nOLCULEN SAGLIKLI TABAN (13-16.08, kesinti oncesi): p50 34,9 dk / p90 87,5 / p95 99,8 / p99 110,6 / max 118,7. Tavanin ~2 saat olmasi dogal: WAQI degeri saat basina damgaliyor ama saat icinde yayinliyor, uzerine 5 dakikalik cekim araligi biniyor.\\n\\n⚠ BU PANEL TAM DURMAYI YAKALAMAZ. Gecikme yalnizca GELEN satirlar icin hesaplanabilir; hic satir gelmezse panel kirmiziya donmez, BOSALIR. 16.08 05:00 - 18.08 06:30 arasinda WAQI ~49 saat yanit vermedi ve o donemde bu panelde hicbir veri yoktu. Tam durmanin gostergesi 'Son verinin yasi' kutusudur; burasi veri AKARKEN olusan bozulmayi gosterir (WAQI yavaslamasi, cekim araliginin buyumesi, Flink'te birikme).\n\nEsik gerekcesi: saglikli medyan ~35 dk. 60 dk (iki kati) 'bir sey degisti' demek, 120 dk ise WAQI'nin dogal tavaninin ustu, yani gercek bir bozulma.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric, 1) AS \"dakika\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 120
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Verinin gelme suresi — p95 (son 24 sa)",
+      "description": "Istasyonun olcum damgasi (measured_at) ile satirin BIZIM tabloya dustugu an (ingested_at) arasindaki fark. Zincirin tamami buna dahil: WAQI'nin kendi yayinlama gecikmesi + publisher'in 5 dakikalik cekim araligi + MQTT + Flink. BU PANEL ISLENME SURESI DEGILDIR -- zincirin paylari OLCULDU (18.08):\n  WAQI'nin kendi yayinlama gecikmesi : ~40 dk'lik medyanin neredeyse tamami. Dogrudan API'ye soruldu, bizim hattimiz devre disiyken WAQI'nin verisi 60,8 dk bayatti.\n  publisher cekim araligi            : 0-5 dk (POLL_SECONDS=300)\n  MQTT + Flink + veritabanina yazma  : 0,0 sn. Publisher'in yayin log damgasi ile ingested_at ayni saniye cikti (6 istasyonda tekrarlandi).\nYani panel 'bizim hattimiz yavas mi' degil 'elimizdeki veri ne kadar bayat' sorusunu olcuyor; yuksek deger gorunce once WAQI'ye bakilir, hatta degil.\\n\\nOLCULEN SAGLIKLI TABAN (13-16.08, kesinti oncesi): p50 34,9 dk / p90 87,5 / p95 99,8 / p99 110,6 / max 118,7. Tavanin ~2 saat olmasi dogal: WAQI degeri saat basina damgaliyor ama saat icinde yayinliyor, uzerine 5 dakikalik cekim araligi biniyor.\\n\\n⚠ BU PANEL TAM DURMAYI YAKALAMAZ. Gecikme yalnizca GELEN satirlar icin hesaplanabilir; hic satir gelmezse panel kirmiziya donmez, BOSALIR. 16.08 05:00 - 18.08 06:30 arasinda WAQI ~49 saat yanit vermedi ve o donemde bu panelde hicbir veri yoktu. Tam durmanin gostergesi 'Son verinin yasi' kutusudur; burasi veri AKARKEN olusan bozulmayi gosterir (WAQI yavaslamasi, cekim araliginin buyumesi, Flink'te birikme).\n\nEsik gerekcesi: saglikli p95 ~100 dk ve olculmus en yuksek deger 118,7. 120 dk bu tavanin hemen ustu; 165 dk ise backend /health'in 180 dakikalik bayatlama esigine yaklastigimiz nokta, yani /health 'ok' demeyi birakmadan once uyarmis oluruz.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT round(percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric, 1) AS \"dakika\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 165
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Verinin gelme suresi — saatlik p50 / p95",
+      "description": "Istasyonun olcum damgasi (measured_at) ile satirin BIZIM tabloya dustugu an (ingested_at) arasindaki fark. Zincirin tamami buna dahil: WAQI'nin kendi yayinlama gecikmesi + publisher'in 5 dakikalik cekim araligi + MQTT + Flink. BU PANEL ISLENME SURESI DEGILDIR -- zincirin paylari OLCULDU (18.08):\n  WAQI'nin kendi yayinlama gecikmesi : ~40 dk'lik medyanin neredeyse tamami. Dogrudan API'ye soruldu, bizim hattimiz devre disiyken WAQI'nin verisi 60,8 dk bayatti.\n  publisher cekim araligi            : 0-5 dk (POLL_SECONDS=300)\n  MQTT + Flink + veritabanina yazma  : 0,0 sn. Publisher'in yayin log damgasi ile ingested_at ayni saniye cikti (6 istasyonda tekrarlandi).\nYani panel 'bizim hattimiz yavas mi' degil 'elimizdeki veri ne kadar bayat' sorusunu olcuyor; yuksek deger gorunce once WAQI'ye bakilir, hatta degil.\\n\\nOLCULEN SAGLIKLI TABAN (13-16.08, kesinti oncesi): p50 34,9 dk / p90 87,5 / p95 99,8 / p99 110,6 / max 118,7. Tavanin ~2 saat olmasi dogal: WAQI degeri saat basina damgaliyor ama saat icinde yayinliyor, uzerine 5 dakikalik cekim araligi biniyor.\\n\\n⚠ BU PANEL TAM DURMAYI YAKALAMAZ. Gecikme yalnizca GELEN satirlar icin hesaplanabilir; hic satir gelmezse panel kirmiziya donmez, BOSALIR. 16.08 05:00 - 18.08 06:30 arasinda WAQI ~49 saat yanit vermedi ve o donemde bu panelde hicbir veri yoktu. Tam durmanin gostergesi 'Son verinin yasi' kutusudur; burasi veri AKARKEN olusan bozulmayi gosterir (WAQI yavaslamasi, cekim araliginin buyumesi, Flink'te birikme).\n\nIki cizgi: p50 tipik durumu, p95 kuyrugu gosterir. Ikisinin ARASI acilirsa sorun genel degil belirli istasyonlardadir; ikisi BIRLIKTE yukselirse kaynak (WAQI) ya da hat genelinde yavaslama vardir. Kova ekseni ingested_at, yani 'ne zaman geldi'; measured_at kullanilsaydi gec gelen satirlar gecmise yazilir ve trend kendini geriye donuk duzeltirdi.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time_bucket('1 hour', ingested_at) AS \"time\", percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"p50 (dk)\", percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"p95 (dk)\" FROM raw_readings WHERE $__timeFilter(ingested_at) GROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "min": 0,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Verinin gelme suresi — istasyon bazinda (saatlik medyan)",
+      "description": "Ust taraftaki ozet paneller (medyan / p95) TUM istasyonlari kapsar ve secicden ETKILENMEZ -- genel resim her zaman ayakta kalsin diye. Bu iki panel ise ustteki \"İstasyon\" seciciye bagli: varsayilan \"All\", tek istasyon secilince yalnizca ona iner.\n\nSecici ada gore degil ID'ye gore calisir. Olculdu: son 7 gunde 115 farkli istasyon ADI ama 104 farkli ID var; bazi istasyonlarin adi zaman icinde degismis. Ada gore secilseydi tek istasyon iki secenege bolunur ve ikisi de eksik veri gosterirdi.\n\nHer istasyon bir cizgi. Tumu acikken kalabalik gorunur; lejantta bir ada tiklamak ya da ustteki seciciden istasyon secmek asil kullanim sekli. Cizgilerin BIRLIKTE yukselmesi kaynak (WAQI) kaynaklidir; TEK bir cizginin ayrilmasi o istasyona ozgudur.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time_bucket('1 hour', ingested_at) AS \"time\", station_name AS metric, percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"dakika\" FROM raw_readings WHERE $__timeFilter(ingested_at) AND station_id IN ($istasyon) GROUP BY 1, 2 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "min": 0,
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Istasyon bazinda gecikme siralamasi (son 24 sa)",
+      "description": "Ust taraftaki ozet paneller (medyan / p95) TUM istasyonlari kapsar ve secicden ETKILENMEZ -- genel resim her zaman ayakta kalsin diye. Bu iki panel ise ustteki \"İstasyon\" seciciye bagli: varsayilan \"All\", tek istasyon secilince yalnizca ona iner.\n\nSecici ada gore degil ID'ye gore calisir. Olculdu: son 7 gunde 115 farkli istasyon ADI ama 104 farkli ID var; bazi istasyonlarin adi zaman icinde degismis. Ada gore secilseydi tek istasyon iki secenege bolunur ve ikisi de eksik veri gosterirdi.\n\nEn yavastan hizliya siralı. Hangi istasyona bakacagini bilmeden once BURAYA bakilir, sonra ustteki seciciden o istasyon secilir. \"Olcum\" sutunu ONEMLI: az satirli bir istasyonun p50'si guvenilmezdir (2-3 olcumun medyani tesadufe acik) ve ayrica dusuk sayi kendi basina bir sinyaldir -- o istasyon veri gondermiyor demektir.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT station_name AS \"Istasyon\", count(*) AS \"Olcum\", round(percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"p50 (dk)\", round(percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"p95 (dk)\", round(max(EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"En yavas (dk)\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours' AND station_id IN ($istasyon) GROUP BY station_name ORDER BY 3 DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p50 (dk)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 60
+                    },
+                    {
+                      "color": "red",
+                      "value": 120
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p95 (dk)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "En yavas (dk)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "m"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "p50 (dk)",
+            "desc": true
+          }
+        ]
+      }
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "istasyon",
+        "label": "İstasyon",
+        "type": "query",
+        "datasource": {
+          "type": "postgres",
+          "uid": "timescaledb"
+        },
+        "query": "SELECT station_name AS __text, station_id AS __value FROM (SELECT DISTINCT ON (station_id) station_id, station_name FROM raw_readings WHERE ingested_at > now() - interval '7 days' ORDER BY station_id, ingested_at DESC) t ORDER BY 1",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "sort": 1
+      }
+    ]
+  }
 }
