@@ -8,7 +8,7 @@
   ],
   "timezone": "Europe/Istanbul",
   "schemaVersion": 39,
-  "version": 6,
+  "version": 7,
   "refresh": "1m",
   "time": {
     "from": "now-24h",
@@ -777,6 +777,223 @@
           }
         ]
       }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "En uzun veri boslugu (30 gun)",
+      "description": "Son 30 gunun en uzun kesintisi. COALESCE(...,0) SART: hic bosluk yoksa max() NULL doner, panel 'No data' gosterip taban rengi olan YESILDE kalirdi -- yani 'olculemedi' ile 'sorun yok' ayni goruntuyu verirdi (ayni tuzak panel 1'de de vardi). Bosluk = ardisik iki olcum saati arasinda 1 saatten fazla fark. Kaynak raw_readings; measured_at istasyonun kendi damgasi oldugu icin bu, WAQI'den veri GELMEDIGI donemleri gosterir. Panel zaman seciciden bagimsiz olarak son 30 gune bakar (timeFrom), cunku panonun varsayilan araligi 24 saat ve iki gunluk bir kesinti orada hic gorunmezdi. Devam eden kesintiyi de yakalamak icin seriye now()-3sa eklenir; 3 saat toleransi WAQI'nin kendi yayin gecikmesi (~40 dk medyan) yuzunden sahte bosluk uretmemek icin, ve backend /health'in bayatlama esigiyle ayni.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 69
+      },
+      "timeFrom": "30d",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 12
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH saatler AS (SELECT DISTINCT time_bucket('1 hour', measured_at) AS saat FROM raw_readings WHERE $__timeFilter(measured_at) AND measured_at <= now()), sinirli AS (SELECT saat FROM saatler UNION ALL SELECT time_bucket('1 hour', now() - interval '3 hours')), farklar AS (SELECT saat, lag(saat) OVER (ORDER BY saat) AS onceki FROM sinirli) SELECT COALESCE(max(EXTRACT(EPOCH FROM (saat - onceki))/3600), 0) AS \"saat\" FROM farklar WHERE onceki IS NOT NULL AND saat - onceki > interval '1 hour'"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Bosluk sayisi (30 gun)",
+      "description": "Son 30 gunda kac ayri kesinti yasandi. Suresi degil ADEDI olcer: bir sure kisa ama sik tekrarlayan kesinti, tek uzun kesinti kadar onemli bir isaret olabilir (or. DNS cozumleme kararsizligi). Bosluk = ardisik iki olcum saati arasinda 1 saatten fazla fark. Kaynak raw_readings; measured_at istasyonun kendi damgasi oldugu icin bu, WAQI'den veri GELMEDIGI donemleri gosterir. Panel zaman seciciden bagimsiz olarak son 30 gune bakar (timeFrom), cunku panonun varsayilan araligi 24 saat ve iki gunluk bir kesinti orada hic gorunmezdi. Devam eden kesintiyi de yakalamak icin seriye now()-3sa eklenir; 3 saat toleransi WAQI'nin kendi yayin gecikmesi (~40 dk medyan) yuzunden sahte bosluk uretmemek icin, ve backend /health'in bayatlama esigiyle ayni.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 69
+      },
+      "timeFrom": "30d",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH saatler AS (SELECT DISTINCT time_bucket('1 hour', measured_at) AS saat FROM raw_readings WHERE $__timeFilter(measured_at) AND measured_at <= now()), sinirli AS (SELECT saat FROM saatler UNION ALL SELECT time_bucket('1 hour', now() - interval '3 hours')), farklar AS (SELECT saat, lag(saat) OVER (ORDER BY saat) AS onceki FROM sinirli) SELECT count(*) AS \"bosluk\" FROM farklar WHERE onceki IS NOT NULL AND saat - onceki > interval '1 hour'"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "table",
+      "title": "Veri bosluklari (30 gun)",
+      "description": "Her kesinti bir satir: en son veri ne zaman geldi, ne zaman tekrar basladi, arada kac saat gecti. En yeniden eskiye siralanir. Bosluk = ardisik iki olcum saati arasinda 1 saatten fazla fark. Kaynak raw_readings; measured_at istasyonun kendi damgasi oldugu icin bu, WAQI'den veri GELMEDIGI donemleri gosterir. Panel zaman seciciden bagimsiz olarak son 30 gune bakar (timeFrom), cunku panonun varsayilan araligi 24 saat ve iki gunluk bir kesinti orada hic gorunmezdi. Devam eden kesintiyi de yakalamak icin seriye now()-3sa eklenir; 3 saat toleransi WAQI'nin kendi yayin gecikmesi (~40 dk medyan) yuzunden sahte bosluk uretmemek icin, ve backend /health'in bayatlama esigiyle ayni.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 74
+      },
+      "timeFrom": "30d",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bosluk (saat)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 3
+                    },
+                    {
+                      "color": "red",
+                      "value": 12
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Son veri"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH saatler AS (SELECT DISTINCT time_bucket('1 hour', measured_at) AS saat FROM raw_readings WHERE $__timeFilter(measured_at) AND measured_at <= now()), sinirli AS (SELECT saat FROM saatler UNION ALL SELECT time_bucket('1 hour', now() - interval '3 hours')), farklar AS (SELECT saat, lag(saat) OVER (ORDER BY saat) AS onceki FROM sinirli) SELECT onceki AS \"Son veri\", saat AS \"Tekrar baslangic\", EXTRACT(EPOCH FROM (saat - onceki))/3600 AS \"Bosluk (saat)\" FROM farklar WHERE onceki IS NOT NULL AND saat - onceki > interval '1 hour' ORDER BY onceki DESC"
+        }
+      ]
     }
   ],
   "templating": {
