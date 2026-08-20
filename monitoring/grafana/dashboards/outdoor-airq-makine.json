@@ -1,19 +1,30 @@
 {
   "uid": "outdoor-airq-makine",
   "title": "outdoor-airq — Makine",
-  "description": "Prometheus + node-exporter. DIKKAT: ic ice sanallastirma yuzunden metriklerin bir kismi bu kutuyu degil Proxmox ana makinesini olcuyor; panel basliklarinda kapsam yazili.",
-  "tags": ["outdoor-airq", "sistem"],
+  "description": "Prometheus + node-exporter. DIKKAT: ic ice sanallastirma yuzunden metriklerin bir kismi bu kutuyu degil Proxmox ana makinesini olcuyor; panel basliklarinda kapsam yazili. Panellerin teknik gerekceleri: dashboards/PANEL-NOTLARI.md",
+  "tags": [
+    "outdoor-airq",
+    "sistem"
+  ],
   "timezone": "Europe/Istanbul",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 4,
   "refresh": "1m",
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "panels": [
     {
       "id": 10,
       "type": "text",
       "title": "Bu dashboard'daki degerler neyi olcuyor",
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "options": {
         "mode": "markdown",
         "content": "Kurulum uc katmanli: **Docker container -> Proxmox LXC (bu kutu) -> Proxmox ana makinesi**. `lxcfs`, `/proc/meminfo` gibi dosyalari **okuyan surecin cgroup'una gore** uretiyor. node-exporter kendi Docker container'indan okudugu icin bellek degerleri bu kutuyu degil kendi payini gosteriyor (olculdu: 7.99 GB bos derken kutunun gercek degeri 3.4 GB idi). CPU ve yuk ortalamasi ise hic sanallastirilmiyor, Proxmox ana makinesinin tamamini olcuyor (yuk 6.17 gorunurken kutudaki container'larin toplam CPU kullanimi %4 idi).\n\n**Guvenilir olan tek sey disk** — gercek dosya sistemi okundugu icin dogru.\n\nKutunun gercek bellek/CPU durumu icin `free -h` ve `docker stats` kullanin. Bunu Prometheus'tan dogru almak, node-exporter'i LXC'nin kok cgroup'unda calistirmayi gerektirir; Docker icinden mumkun degil."
@@ -23,9 +34,17 @@
       "id": 1,
       "type": "stat",
       "title": "Bos disk (/) — BU KUTU, guvenilir",
-      "description": "Gercek dosya sistemi okunuyor, sanallastirmadan etkilenmiyor. df -h ile dogrulandi. Docker imajlari diski sessizce doldurur (infra#4).",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 7 },
+      "description": "Sunucuda kalan boş disk alanı. **Bu değer güvenilir** — gerçekten bu makineyi ölçüyor. Veritabanı, yedekler ve Docker imajları hep bu diskte; alan azalırsa önce Docker imajlarına bakılır, sessizce birikirler.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
       "targets": [
         {
           "refId": "A",
@@ -39,16 +58,31 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "yellow", "value": 10000000000 },
-              { "color": "green", "value": 30000000000 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10000000000
+              },
+              {
+                "color": "green",
+                "value": 30000000000
+              }
             ]
           }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "value",
         "graphMode": "area",
         "textMode": "value"
@@ -58,8 +92,16 @@
       "id": 2,
       "type": "timeseries",
       "title": "Disk kullanimi (/) — BU KUTU, guvenilir",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 7 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
       "targets": [
         {
           "refId": "A",
@@ -71,23 +113,49 @@
         "defaults": {
           "unit": "bytes",
           "min": 0,
-          "custom": { "lineWidth": 1, "fillOpacity": 15 },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 15
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single" }
-      }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "description": "Kullanılan disk alanının zaman içindeki seyri. Sürekli yükselen bir eğri diskin dolmakta olduğunu gösterir. **Bu değer güvenilir** — gerçekten bu makineyi ölçüyor."
     },
     {
       "id": 3,
       "type": "timeseries",
       "title": "CPU kullanimi — PROXMOX ANA MAKINESI (bu kutu degil)",
-      "description": "node_cpu_seconds_total sanallastirilmiyor; tum fiziksel sunucuyu olcuyor. Bu kutunun kendi kullanimi icin `docker stats`. rate() ile sayacin turevi aliniyor: sayac surekli artar, anlamli olan artis hizidir.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "description": "⚠ **Bu değer bizim sunucumuzun değil, onun üzerinde çalıştığı fiziksel makinenin** işlemci kullanımıdır. Sistemimiz bir konteynerin içinde çalışıyor ve konteyner işlemci bilgisini alttaki makineden okuyor — dolayısıyla buradaki yükselme bizimle ilgili olmayabilir. Bizim kendi kullanımımızı görmek için sunucuda `docker stats` komutu.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
       "targets": [
         {
           "refId": "A",
@@ -100,40 +168,90 @@
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "custom": { "lineWidth": 1, "fillOpacity": 10 },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       }
     },
     {
       "id": 4,
       "type": "timeseries",
       "title": "Yuk ortalamasi — PROXMOX ANA MAKINESI (bu kutu degil)",
-      "description": "lxcfs loadavg sanallastirmasi Proxmox'ta varsayilan olarak kapali; deger tum fiziksel sunucunun yuku.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "description": "⚠ **Bu değer de bizim sunucumuzun değil, alttaki fiziksel makinenin** yüküdür — üstteki işlemci paneliyle aynı sebep. Yük ortalaması, sistemde iş bekleyen süreç sayısının kabaca ölçüsüdür. Alttaki makine boğulursa biz de yavaşlarız, o yüzden büsbütün ilgisiz değil ama bizim değerimiz değil.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
       "targets": [
-        { "refId": "A", "expr": "node_load1", "legendFormat": "1 dk" },
-        { "refId": "B", "expr": "node_load15", "legendFormat": "15 dk" }
+        {
+          "refId": "A",
+          "expr": "node_load1",
+          "legendFormat": "1 dk"
+        },
+        {
+          "refId": "B",
+          "expr": "node_load15",
+          "legendFormat": "15 dk"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "short",
           "decimals": 2,
           "min": 0,
-          "custom": { "lineWidth": 1, "fillOpacity": 5 },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 5
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "multi" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     }
   ]

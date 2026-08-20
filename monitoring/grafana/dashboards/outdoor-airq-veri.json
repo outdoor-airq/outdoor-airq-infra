@@ -1,14 +1,14 @@
 {
   "uid": "outdoor-airq-veri",
   "title": "outdoor-airq — Veri",
-  "description": "Uygulamanin kendi verisi, dogrudan TimescaleDB'den. Arada exporter yok; Grafana canli tabloya SQL soruyor.",
+  "description": "Uygulamanin kendi verisi, dogrudan TimescaleDB'den. Arada exporter yok; Grafana canli tabloya SQL soruyor. Panellerin teknik gerekceleri: dashboards/PANEL-NOTLARI.md",
   "tags": [
     "outdoor-airq",
     "aqi"
   ],
   "timezone": "Europe/Istanbul",
   "schemaVersion": 39,
-  "version": 7,
+  "version": 9,
   "refresh": "1m",
   "time": {
     "from": "now-24h",
@@ -19,7 +19,7 @@
       "id": 1,
       "type": "stat",
       "title": "Son verinin yasi",
-      "description": "max(measured_at) ile simdi arasindaki fark. Esikler backend /health ile ayni mantikta: 3 saati asarsa akis durmus sayilir. COALESCE(...,99999) SART: bos tabloda max() NULL doner, NULL yayilir ve panel 'No data' gosterip taban rengi olan YESILDE kalirdi -- yani /health 503 derken bu panel saglikli gorunurdu. WHERE measured_at <= now() de /health ile ayni gerekce: saati ileri kaymis tek istasyon yasi sifirlar.",
+      "description": "En son ölçümün üstünden kaç dakika geçtiğini gösterir. İstasyonlar saatte bir veri gönderdiği için **0–60 dakika normaldir**. 120 dakikayı geçerse sarı, 180 dakikayı (3 saat) geçerse kırmızı olur — kırmızı, veri akışının durduğu ve birinin bakması gerektiği anlamına gelir.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -79,7 +79,7 @@
       "id": 2,
       "type": "stat",
       "title": "Rapor veren istasyon (3 saat)",
-      "description": "Son 3 saatte olcum gonderen BENZERSIZ istasyon sayisi -- `stations` tablosundaki toplam degil. Fark onemli: tablo birikimlidir, satir silinmez, bu yuzden toplam sayi kapsamin daralmasini gizler. Sistem 2026-08-12'de Marmara'ya genisletilince istasyon 21'den 100'e cikti; kapsam daralirsa (or. WAQI kotasi) veri akmaya devam eder ve /health yine 'ok' der, ama BU sayi duser. Trendi asagidaki panelde.",
+      "description": "Son 3 saatte veri gönderen istasyon sayısı. Sistemde kayıtlı toplam istasyon sayısından farklıdır: kayıtlar silinmediği için toplam hep artar, ama **kaç tanesinin gerçekten çalıştığını yalnızca bu kutu söyler**. Sayının kalıcı olarak düşmesi, bir kısım istasyonun sessizce susmuş olduğu anlamına gelir.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -174,13 +174,14 @@
         "colorMode": "value",
         "graphMode": "none",
         "textMode": "value"
-      }
+      },
+      "description": "Projenin başından beri toplanmış toplam ölçüm sayısı. **Sürekli artması gerekir** — kabaca saatte 90 satır. Sayının sabit kalması, veri gelse bile veritabanına yazılamadığı anlamına gelir."
     },
     {
       "id": 4,
       "type": "stat",
       "title": "Anomali",
-      "description": "Canli EMA tespitleri (aqi_anomalies). Backfill kaynakli olanlar filtered_readings'te, burada degil.",
+      "description": "Sıra dışı bulunan ölçüm sayısı. Bir istasyonun değeri kendi geçmiş ortalamasından çok saparsa işaretlenir. Dikkat: bu **\"hava kötü\" demek değildir**, \"bu ölçüm şüpheli, sensör bozulmuş olabilir\" demektir. Veri kesintisinden sonraki ilk saatlerde sayı yapay olarak şişer, çünkü karşılaştırma yapılan geçmiş ortalama bayatlamıştır.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -235,7 +236,7 @@
       "id": 5,
       "type": "timeseries",
       "title": "Istasyon bazinda AQI",
-      "description": "WAQI saatlik yayin yaptigi icin cizgiler saat basi kirilir; ara noktalarin olmamasi veri kaybi degil.",
+      "description": "Her istasyonun hava kalitesi indeksinin (AQI) zaman içindeki seyri. Her çizgi bir istasyon, o yüzden ilk bakışta kalabalık görünür — **alttaki listede bir istasyon adına tıklarsan yalnızca onu gösterir.** Çizgilerin saat başlarında kırılması normaldir, veri saatlik geliyor.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -292,7 +293,7 @@
       "id": 6,
       "type": "table",
       "title": "Her istasyonun son olcumu (son 7 gun)",
-      "description": "7 gunluk pencere SART: zaman kosulu olmadan DISTINCT ON tum hypertable'i tarayip global siralama yapar ve panel 1 dakikada bir kosar. Tablo surekli buyudugu icin (SIM backfill'iyle 118 bin satiri gecti) sinirsiz sorgu zamanla agirlasir. 7 gun, en uzun makul veri kesintisini bile kapsar.",
+      "description": "Her istasyonun **en son** ölçümü tek satırda: AQI, baskın kirletici, PM2.5, PM10, sıcaklık ve ölçüm zamanı. \"Şu anda nerede ne var\" tablosudur. Başlıklara tıklayarak sıralayabilir, kutulara yazarak filtreleyebilirsin.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -386,7 +387,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Kapsam trendi — saatlik rapor veren istasyon",
-      "description": "Kapsam daralmasinin gorunur oldugu tek yer. /health tazelige bakar: istasyonlarin cogu sessizce dusse bile kalan birkaci veri gonderdigi surece 'ok' der. Anlamli bir esik gecmise gore TREND ister (istasyon sayisi WAQI'ye bagli ve kendiliginden oynuyor -- 13.08 sabahi 97'den 100'e cikti, kod degismeden), o yuzden esik endpoint'e degil buraya ait. Cizgide surekli bir dusus = kapsam sorunu (WAQI kotasi, publisher hatasi, sinir kutusu degisimi).\n\nSON 3 SAAT BILEREK HARIC. WAQI'nin ingest gecikmesi ~2 saate kadar cikiyor, yani saatlik bir kova ancak ~2 saat sonra tamamlaniyor; olculdu (13.08 07:43'te): tamamlanmis kovalar 88-89 iken dolmakta olan 06:00 kovasi 74 gosteriyordu. Dislanmasaydi grafik SUREKLI sahte bir dususle biterdi -- tam da yakalamak istedigimiz sinyalin taklidi. Bedeli: trend 3 saat gecikmeli, ki surekli kapsam daralmasini gormek icin yeterli. Anlik deger icin ustteki stat paneli.",
+      "description": "Saat saat kaç istasyonun veri gönderdiği — üstteki \"Rapor veren istasyon\" kutusunun zaman içindeki hali. Çizginin kalıcı olarak aşağı gitmesi kapsama sorunudur. **Son 3 saat bilerek gösterilmez:** içinde bulunduğumuz saat henüz dolmadığı için grafiğin sonunda her zaman sahte bir düşüş görünürdü. Anlık durum için üstteki kutuya bak.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -441,7 +442,7 @@
       "id": 8,
       "type": "stat",
       "title": "Verinin gelme suresi — medyan (son 24 sa)",
-      "description": "Istasyonun olcum damgasi (measured_at) ile satirin BIZIM tabloya dustugu an (ingested_at) arasindaki fark. Zincirin tamami buna dahil: WAQI'nin kendi yayinlama gecikmesi + publisher'in 5 dakikalik cekim araligi + MQTT + Flink. BU PANEL ISLENME SURESI DEGILDIR -- zincirin paylari OLCULDU (18.08):\n  WAQI'nin kendi yayinlama gecikmesi : ~40 dk'lik medyanin neredeyse tamami. Dogrudan API'ye soruldu, bizim hattimiz devre disiyken WAQI'nin verisi 60,8 dk bayatti.\n  publisher cekim araligi            : 0-5 dk (POLL_SECONDS=300)\n  MQTT + Flink + veritabanina yazma  : 0,0 sn. Publisher'in yayin log damgasi ile ingested_at ayni saniye cikti (6 istasyonda tekrarlandi).\nYani panel 'bizim hattimiz yavas mi' degil 'elimizdeki veri ne kadar bayat' sorusunu olcuyor; yuksek deger gorunce once WAQI'ye bakilir, hatta degil.\\n\\nOLCULEN SAGLIKLI TABAN (13-16.08, kesinti oncesi): p50 34,9 dk / p90 87,5 / p95 99,8 / p99 110,6 / max 118,7. Tavanin ~2 saat olmasi dogal: WAQI degeri saat basina damgaliyor ama saat icinde yayinliyor, uzerine 5 dakikalik cekim araligi biniyor.\\n\\n⚠ BU PANEL TAM DURMAYI YAKALAMAZ. Gecikme yalnizca GELEN satirlar icin hesaplanabilir; hic satir gelmezse panel kirmiziya donmez, BOSALIR. 16.08 05:00 - 18.08 06:30 arasinda WAQI ~49 saat yanit vermedi ve o donemde bu panelde hicbir veri yoktu. Tam durmanin gostergesi 'Son verinin yasi' kutusudur; burasi veri AKARKEN olusan bozulmayi gosterir (WAQI yavaslamasi, cekim araliginin buyumesi, Flink'te birikme).\n\nEsik gerekcesi: saglikli medyan ~35 dk. 60 dk (iki kati) 'bir sey degisti' demek, 120 dk ise WAQI'nin dogal tavaninin ustu, yani gercek bir bozulma.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "description": "Bir ölçümün istasyonda damgalandığı andan bizim veritabanımıza düştüğü ana kadar geçen **tipik** süre. Normali yaklaşık **35 dakikadır**. Bu sürenin neredeyse tamamı veriyi aldığımız WAQI servisinin kendi yayınlama gecikmesidir; bizim işlememiz ölçüldüğünde 0 saniye çıktı. Yani yüksek değer \"bizim sistem yavaş\" değil, **\"elimizdeki veri bayat\"** demektir. 60 dakikayı geçerse sarı, 120'yi geçerse kırmızı.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -501,7 +502,7 @@
       "id": 9,
       "type": "stat",
       "title": "Verinin gelme suresi — p95 (son 24 sa)",
-      "description": "Istasyonun olcum damgasi (measured_at) ile satirin BIZIM tabloya dustugu an (ingested_at) arasindaki fark. Zincirin tamami buna dahil: WAQI'nin kendi yayinlama gecikmesi + publisher'in 5 dakikalik cekim araligi + MQTT + Flink. BU PANEL ISLENME SURESI DEGILDIR -- zincirin paylari OLCULDU (18.08):\n  WAQI'nin kendi yayinlama gecikmesi : ~40 dk'lik medyanin neredeyse tamami. Dogrudan API'ye soruldu, bizim hattimiz devre disiyken WAQI'nin verisi 60,8 dk bayatti.\n  publisher cekim araligi            : 0-5 dk (POLL_SECONDS=300)\n  MQTT + Flink + veritabanina yazma  : 0,0 sn. Publisher'in yayin log damgasi ile ingested_at ayni saniye cikti (6 istasyonda tekrarlandi).\nYani panel 'bizim hattimiz yavas mi' degil 'elimizdeki veri ne kadar bayat' sorusunu olcuyor; yuksek deger gorunce once WAQI'ye bakilir, hatta degil.\\n\\nOLCULEN SAGLIKLI TABAN (13-16.08, kesinti oncesi): p50 34,9 dk / p90 87,5 / p95 99,8 / p99 110,6 / max 118,7. Tavanin ~2 saat olmasi dogal: WAQI degeri saat basina damgaliyor ama saat icinde yayinliyor, uzerine 5 dakikalik cekim araligi biniyor.\\n\\n⚠ BU PANEL TAM DURMAYI YAKALAMAZ. Gecikme yalnizca GELEN satirlar icin hesaplanabilir; hic satir gelmezse panel kirmiziya donmez, BOSALIR. 16.08 05:00 - 18.08 06:30 arasinda WAQI ~49 saat yanit vermedi ve o donemde bu panelde hicbir veri yoktu. Tam durmanin gostergesi 'Son verinin yasi' kutusudur; burasi veri AKARKEN olusan bozulmayi gosterir (WAQI yavaslamasi, cekim araliginin buyumesi, Flink'te birikme).\n\nEsik gerekcesi: saglikli p95 ~100 dk ve olculmus en yuksek deger 118,7. 120 dk bu tavanin hemen ustu; 165 dk ise backend /health'in 180 dakikalik bayatlama esigine yaklastigimiz nokta, yani /health 'ok' demeyi birakmadan once uyarmis oluruz.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "description": "Yukarıdakiyle aynı ölçüm, ama **en yavaş yüzde 5'lik dilim**. Medyan tipik durumu, bu ise en kötü durumu gösterir. Normali yaklaşık **100 dakika**; şimdiye kadar ölçülen en yüksek değer 119. 120 dakikayı geçerse sarı, 165'i geçerse kırmızı — 165, sistemin kendini \"bayat\" ilan ettiği 180 dakikaya yaklaştığımız noktadır.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -561,7 +562,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Verinin gelme suresi — saatlik p50 / p95",
-      "description": "Istasyonun olcum damgasi (measured_at) ile satirin BIZIM tabloya dustugu an (ingested_at) arasindaki fark. Zincirin tamami buna dahil: WAQI'nin kendi yayinlama gecikmesi + publisher'in 5 dakikalik cekim araligi + MQTT + Flink. BU PANEL ISLENME SURESI DEGILDIR -- zincirin paylari OLCULDU (18.08):\n  WAQI'nin kendi yayinlama gecikmesi : ~40 dk'lik medyanin neredeyse tamami. Dogrudan API'ye soruldu, bizim hattimiz devre disiyken WAQI'nin verisi 60,8 dk bayatti.\n  publisher cekim araligi            : 0-5 dk (POLL_SECONDS=300)\n  MQTT + Flink + veritabanina yazma  : 0,0 sn. Publisher'in yayin log damgasi ile ingested_at ayni saniye cikti (6 istasyonda tekrarlandi).\nYani panel 'bizim hattimiz yavas mi' degil 'elimizdeki veri ne kadar bayat' sorusunu olcuyor; yuksek deger gorunce once WAQI'ye bakilir, hatta degil.\\n\\nOLCULEN SAGLIKLI TABAN (13-16.08, kesinti oncesi): p50 34,9 dk / p90 87,5 / p95 99,8 / p99 110,6 / max 118,7. Tavanin ~2 saat olmasi dogal: WAQI degeri saat basina damgaliyor ama saat icinde yayinliyor, uzerine 5 dakikalik cekim araligi biniyor.\\n\\n⚠ BU PANEL TAM DURMAYI YAKALAMAZ. Gecikme yalnizca GELEN satirlar icin hesaplanabilir; hic satir gelmezse panel kirmiziya donmez, BOSALIR. 16.08 05:00 - 18.08 06:30 arasinda WAQI ~49 saat yanit vermedi ve o donemde bu panelde hicbir veri yoktu. Tam durmanin gostergesi 'Son verinin yasi' kutusudur; burasi veri AKARKEN olusan bozulmayi gosterir (WAQI yavaslamasi, cekim araliginin buyumesi, Flink'te birikme).\n\nIki cizgi: p50 tipik durumu, p95 kuyrugu gosterir. Ikisinin ARASI acilirsa sorun genel degil belirli istasyonlardadir; ikisi BIRLIKTE yukselirse kaynak (WAQI) ya da hat genelinde yavaslama vardir. Kova ekseni ingested_at, yani 'ne zaman geldi'; measured_at kullanilsaydi gec gelen satirlar gecmise yazilir ve trend kendini geriye donuk duzeltirdi.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "description": "Yukarıdaki iki değerin saat saat seyri. Okuma biçimi şöyle: iki çizginin **arası açılırsa** sorun genel değil belirli istasyonlardadır; **ikisi birlikte yükselirse** kaynakta ya da hattın tamamında yavaşlama var demektir.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -616,7 +617,7 @@
       "id": 11,
       "type": "timeseries",
       "title": "Verinin gelme suresi — istasyon bazinda (saatlik medyan)",
-      "description": "Ust taraftaki ozet paneller (medyan / p95) TUM istasyonlari kapsar ve secicden ETKILENMEZ -- genel resim her zaman ayakta kalsin diye. Bu iki panel ise ustteki \"İstasyon\" seciciye bagli: varsayilan \"All\", tek istasyon secilince yalnizca ona iner.\n\nSecici ada gore degil ID'ye gore calisir. Olculdu: son 7 gunde 115 farkli istasyon ADI ama 104 farkli ID var; bazi istasyonlarin adi zaman icinde degismis. Ada gore secilseydi tek istasyon iki secenege bolunur ve ikisi de eksik veri gosterirdi.\n\nHer istasyon bir cizgi. Tumu acikken kalabalik gorunur; lejantta bir ada tiklamak ya da ustteki seciciden istasyon secmek asil kullanim sekli. Cizgilerin BIRLIKTE yukselmesi kaynak (WAQI) kaynaklidir; TEK bir cizginin ayrilmasi o istasyona ozgudur.\n\nBASLIK NEDEN BU: iki kez degisti. Once \"Yutma gecikmesi\" idi -- \"yutma\" bizim eylemimiz oldugu icin \"bizim islememiz ne kadar suruyor\" diye okundu (olculdu: bizim payimiz 0,0 sn). Sonra \"Gelen verinin yasi\" denendi -- bu sefer kutu 1'deki \"Son verinin yasi\" ile karisti, cunku o SIMDIYE gore olcuyor, bu ise GELDIGI ANA gore. \"Gelme suresi\"nde fiilin faili verinin kendisi (veri gelir, kimse getirmez), yani kimseyi isaret etmiyor ve \"yas\" kelimesiyle de cakismiyor.",
+      "description": "Her istasyonun gecikmesi ayrı bir çizgi. Çizgilerin **birlikte** yükselmesi kaynaktan gelir; **tek bir çizginin** diğerlerinden ayrılması o istasyona özgü bir sorundur. Kalabalık gelirse üstteki \"İstasyon\" seçicisinden tek istasyon seçebilirsin.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -672,7 +673,7 @@
       "id": 12,
       "type": "table",
       "title": "Istasyon bazinda gecikme siralamasi (son 24 sa)",
-      "description": "Ust taraftaki ozet paneller (medyan / p95) TUM istasyonlari kapsar ve secicden ETKILENMEZ -- genel resim her zaman ayakta kalsin diye. Bu iki panel ise ustteki \"İstasyon\" seciciye bagli: varsayilan \"All\", tek istasyon secilince yalnizca ona iner.\n\nSecici ada gore degil ID'ye gore calisir. Olculdu: son 7 gunde 115 farkli istasyon ADI ama 104 farkli ID var; bazi istasyonlarin adi zaman icinde degismis. Ada gore secilseydi tek istasyon iki secenege bolunur ve ikisi de eksik veri gosterirdi.\n\nEn yavastan hizliya siralı. Hangi istasyona bakacagini bilmeden once BURAYA bakilir, sonra ustteki seciciden o istasyon secilir. \"Olcum\" sutunu ONEMLI: az satirli bir istasyonun p50'si guvenilmezdir (2-3 olcumun medyani tesadufe acik) ve ayrica dusuk sayi kendi basina bir sinyaldir -- o istasyon veri gondermiyor demektir.",
+      "description": "İstasyonlar en yavaştan en hızlıya sıralı. Hangi istasyona bakacağını bilmiyorsan **önce buraya bak**, sonra üstteki seçiciden o istasyonu seç. \"Ölçüm\" sütunu önemli: az ölçümü olan bir istasyonun ortalaması güvenilmez, ayrıca düşük sayı zaten o istasyonun yeterince veri göndermediği anlamına gelir.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -782,7 +783,7 @@
       "id": 13,
       "type": "stat",
       "title": "En uzun veri boslugu (30 gun)",
-      "description": "Son 30 gunun en uzun kesintisi. COALESCE(...,0) SART: hic bosluk yoksa max() NULL doner, panel 'No data' gosterip taban rengi olan YESILDE kalirdi -- yani 'olculemedi' ile 'sorun yok' ayni goruntuyu verirdi (ayni tuzak panel 1'de de vardi). Bosluk = ardisik iki olcum saati arasinda 1 saatten fazla fark. Kaynak raw_readings; measured_at istasyonun kendi damgasi oldugu icin bu, WAQI'den veri GELMEDIGI donemleri gosterir. Panel zaman seciciden bagimsiz olarak son 30 gune bakar (timeFrom), cunku panonun varsayilan araligi 24 saat ve iki gunluk bir kesinti orada hic gorunmezdi. Devam eden kesintiyi de yakalamak icin seriye now()-3sa eklenir; 3 saat toleransi WAQI'nin kendi yayin gecikmesi (~40 dk medyan) yuzunden sahte bosluk uretmemek icin, ve backend /health'in bayatlama esigiyle ayni.",
+      "description": "Son 30 günde yaşanan **en uzun** veri kesintisi. 0 görüyorsan hiç kesinti olmamış demektir. 3 saati geçerse sarı, 12 saati geçerse kırmızı olur. Kesinti genelde internet ya da kaynak servis kaynaklıdır; o dönemin verisi geri getirilemez.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -845,7 +846,7 @@
       "id": 14,
       "type": "stat",
       "title": "Bosluk sayisi (30 gun)",
-      "description": "Son 30 gunda kac ayri kesinti yasandi. Suresi degil ADEDI olcer: bir sure kisa ama sik tekrarlayan kesinti, tek uzun kesinti kadar onemli bir isaret olabilir (or. DNS cozumleme kararsizligi). Bosluk = ardisik iki olcum saati arasinda 1 saatten fazla fark. Kaynak raw_readings; measured_at istasyonun kendi damgasi oldugu icin bu, WAQI'den veri GELMEDIGI donemleri gosterir. Panel zaman seciciden bagimsiz olarak son 30 gune bakar (timeFrom), cunku panonun varsayilan araligi 24 saat ve iki gunluk bir kesinti orada hic gorunmezdi. Devam eden kesintiyi de yakalamak icin seriye now()-3sa eklenir; 3 saat toleransi WAQI'nin kendi yayin gecikmesi (~40 dk medyan) yuzunden sahte bosluk uretmemek icin, ve backend /health'in bayatlama esigiyle ayni.",
+      "description": "Son 30 günde **kaç ayrı** kesinti yaşandığı. Süreyi değil adedi ölçer, çünkü kısa ama sık tekrarlayan kesintiler de tek uzun kesinti kadar önemli bir işarettir — genelde bağlantının kararsız olduğunu gösterir.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
@@ -908,7 +909,7 @@
       "id": 15,
       "type": "table",
       "title": "Veri bosluklari (30 gun)",
-      "description": "Her kesinti bir satir: en son veri ne zaman geldi, ne zaman tekrar basladi, arada kac saat gecti. En yeniden eskiye siralanir. Bosluk = ardisik iki olcum saati arasinda 1 saatten fazla fark. Kaynak raw_readings; measured_at istasyonun kendi damgasi oldugu icin bu, WAQI'den veri GELMEDIGI donemleri gosterir. Panel zaman seciciden bagimsiz olarak son 30 gune bakar (timeFrom), cunku panonun varsayilan araligi 24 saat ve iki gunluk bir kesinti orada hic gorunmezdi. Devam eden kesintiyi de yakalamak icin seriye now()-3sa eklenir; 3 saat toleransi WAQI'nin kendi yayin gecikmesi (~40 dk medyan) yuzunden sahte bosluk uretmemek icin, ve backend /health'in bayatlama esigiyle ayni.",
+      "description": "Her kesinti bir satır: veri en son ne zaman geldi, ne zaman tekrar başladı ve arada kaç saat geçti. En yeniden eskiye sıralı. Süre sütunu 3 saatten uzunsa sarı, 12 saatten uzunsa kırmızı boyanır.",
       "datasource": {
         "type": "postgres",
         "uid": "timescaledb"
