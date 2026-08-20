@@ -8,13 +8,25 @@
   ],
   "timezone": "Europe/Istanbul",
   "schemaVersion": 39,
-  "version": 10,
+  "version": 11,
   "refresh": "1m",
   "time": {
     "from": "now-24h",
     "to": "now"
   },
   "panels": [
+    {
+      "type": "row",
+      "title": "Özet — şu an durum ne",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
     {
       "id": 1,
       "type": "stat",
@@ -28,7 +40,7 @@
         "h": 5,
         "w": 6,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "targets": [
         {
@@ -88,7 +100,7 @@
         "h": 5,
         "w": 6,
         "x": 6,
-        "y": 0
+        "y": 1
       },
       "targets": [
         {
@@ -138,7 +150,7 @@
         "h": 5,
         "w": 6,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "targets": [
         {
@@ -190,7 +202,7 @@
         "h": 5,
         "w": 6,
         "x": 18,
-        "y": 0
+        "y": 1
       },
       "targets": [
         {
@@ -233,6 +245,18 @@
       }
     },
     {
+      "type": "row",
+      "title": "Hava kalitesi verisi",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "panels": []
+    },
+    {
       "id": 5,
       "type": "timeseries",
       "title": "Istasyon bazinda AQI",
@@ -245,7 +269,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 7
       },
       "targets": [
         {
@@ -302,7 +326,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 15
+        "y": 17
       },
       "targets": [
         {
@@ -384,6 +408,18 @@
       }
     },
     {
+      "type": "row",
+      "title": "Kapsama ve veri kesintileri",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "panels": []
+    },
+    {
       "id": 7,
       "type": "timeseries",
       "title": "Kapsam trendi — saatlik rapor veren istasyon",
@@ -396,7 +432,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 29
       },
       "targets": [
         {
@@ -439,347 +475,6 @@
       }
     },
     {
-      "id": 8,
-      "type": "stat",
-      "title": "Verinin gelme suresi — medyan (son 24 sa)",
-      "description": "Bir ölçümün istasyonda damgalandığı andan bizim veritabanımıza düştüğü ana kadar geçen **tipik** süre. Normali yaklaşık **35 dakikadır**. Bu sürenin neredeyse tamamı veriyi aldığımız WAQI servisinin kendi yayınlama gecikmesidir; bizim işlememiz ölçüldüğünde 0 saniye çıktı. Yani yüksek değer \"bizim sistem yavaş\" değil, **\"elimizdeki veri bayat\"** demektir. 60 dakikayı geçerse sarı, 120'yi geçerse kırmızı.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "timescaledb"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 0,
-        "y": 35
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric, 1) AS \"dakika\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours'"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "m",
-          "decimals": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 60
-              },
-              {
-                "color": "red",
-                "value": 120
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "none"
-      }
-    },
-    {
-      "id": 9,
-      "type": "stat",
-      "title": "Verinin gelme suresi — p95 (son 24 sa)",
-      "description": "Yukarıdakiyle aynı ölçüm, ama **en yavaş yüzde 5'lik dilim**. Medyan tipik durumu, bu ise en kötü durumu gösterir. Normali yaklaşık **100 dakika**; şimdiye kadar ölçülen en yüksek değer 119. 120 dakikayı geçerse sarı, 165'i geçerse kırmızı — 165, sistemin kendini \"bayat\" ilan ettiği 180 dakikaya yaklaştığımız noktadır.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "timescaledb"
-      },
-      "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 12,
-        "y": 35
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT round(percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric, 1) AS \"dakika\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours'"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "m",
-          "decimals": 1,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 120
-              },
-              {
-                "color": "red",
-                "value": 165
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "none"
-      }
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Verinin gelme suresi — saatlik p50 / p95",
-      "description": "Yukarıdaki iki değerin saat saat seyri. Okuma biçimi şöyle: iki çizginin **arası açılırsa** sorun genel değil belirli istasyonlardadır; **ikisi birlikte yükselirse** kaynakta ya da hattın tamamında yavaşlama var demektir.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "timescaledb"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 40
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT time_bucket('1 hour', ingested_at) AS \"time\", percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"p50 (dk)\", percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"p95 (dk)\" FROM raw_readings WHERE $__timeFilter(ingested_at) GROUP BY 1 ORDER BY 1"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "m",
-          "min": 0,
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 8,
-            "showPoints": "auto"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi"
-        }
-      }
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "Verinin gelme suresi — istasyon bazinda (saatlik medyan)",
-      "description": "Her istasyonun gecikmesi ayrı bir çizgi. Çizgilerin **birlikte** yükselmesi kaynaktan gelir; **tek bir çizginin** diğerlerinden ayrılması o istasyona özgü bir sorundur. Kalabalık gelirse üstteki \"İstasyon\" seçicisinden tek istasyon seçebilirsin.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "timescaledb"
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 24,
-        "x": 0,
-        "y": 49
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT time_bucket('1 hour', ingested_at) AS \"time\", station_name AS metric, percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"dakika\" FROM raw_readings WHERE $__timeFilter(ingested_at) AND station_id IN ($istasyon) GROUP BY 1, 2 ORDER BY 1"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "m",
-          "min": 0,
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 0,
-            "showPoints": "never"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 12,
-      "type": "table",
-      "title": "Istasyon bazinda gecikme siralamasi (son 24 sa)",
-      "description": "İstasyonlar en yavaştan en hızlıya sıralı. Hangi istasyona bakacağını bilmiyorsan **önce buraya bak**, sonra üstteki seçiciden o istasyonu seç. \"Ölçüm\" sütunu önemli: az ölçümü olan bir istasyonun ortalaması güvenilmez, ayrıca düşük sayı zaten o istasyonun yeterince veri göndermediği anlamına gelir.",
-      "datasource": {
-        "type": "postgres",
-        "uid": "timescaledb"
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 24,
-        "x": 0,
-        "y": 58
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT station_name AS \"Istasyon\", count(*) AS \"Olcum\", round(percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"p50 (dk)\", round(percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"p95 (dk)\", round(max(EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"En yavas (dk)\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours' AND station_id IN ($istasyon) GROUP BY station_name ORDER BY 3 DESC"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p50 (dk)"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "m"
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "yellow",
-                      "value": 60
-                    },
-                    {
-                      "color": "red",
-                      "value": 120
-                    }
-                  ]
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "p95 (dk)"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "m"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "En yavas (dk)"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "m"
-              }
-            ]
-          }
-        ]
-      },
-      "options": {
-        "showHeader": true,
-        "sortBy": [
-          {
-            "displayName": "p50 (dk)",
-            "desc": true
-          }
-        ]
-      }
-    },
-    {
       "id": 13,
       "type": "stat",
       "title": "En uzun veri boslugu (30 gun)",
@@ -792,7 +487,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 69
+        "y": 38
       },
       "timeFrom": "30d",
       "fieldConfig": {
@@ -855,7 +550,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 69
+        "y": 38
       },
       "timeFrom": "30d",
       "fieldConfig": {
@@ -918,7 +613,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 74
+        "y": 43
       },
       "timeFrom": "30d",
       "fieldConfig": {
@@ -997,6 +692,18 @@
       ]
     },
     {
+      "type": "row",
+      "title": "Anomaliler",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "panels": []
+    },
+    {
       "id": 16,
       "type": "stat",
       "title": "Son anomali ne zaman",
@@ -1008,7 +715,7 @@
         "h": 5,
         "w": 12,
         "x": 0,
-        "y": 84
+        "y": 54
       },
       "description": "En son sıra dışı ölçümün üstünden ne kadar geçtiği. **Bu kutu bir sağlık göstergesi DEĞİLDİR** — bilerek renklendirilmedi. Uzun süre anomali çıkmaması iyi haber de olabilir (hava sakin), kötü haber de (tespit bozuk); bu kutu ikisini ayırt edemez. Ölçüldü: veri sorunsuz akarken 32 ve 53 saat boyunca hiç anomali çıkmadığı dönemler oldu. Tespitin çalışıp çalışmadığını üstteki \"Son verinin yaşı\" kutusundan takip et.",
       "fieldConfig": {
@@ -1062,7 +769,7 @@
         "h": 5,
         "w": 12,
         "x": 12,
-        "y": 84
+        "y": 54
       },
       "description": "Son 24 saatte kaç sıra dışı ölçüm işaretlendi. Tipik gün 2–30 arası; bunun çok üstü, ya gerçek bir kirlilik olayı ya da bir veri kesintisinden yeni çıkılmış olduğu anlamına gelir. Kesinti sonrası sayı yapay olarak şişer, çünkü karşılaştırma yapılan geçmiş ortalama bayatlamıştır.",
       "fieldConfig": {
@@ -1124,7 +831,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 59
       },
       "timeFrom": "30d",
       "description": "Gün gün kaç anomali işaretlendiği, şiddetine göre ayrılmış. **WARNING** %30–50 arası sapma, **CRITICAL** %50 üstü. Ani bir sıçrama iki şeyden birini gösterir: gerçek bir hava olayı ya da veri kesintisinden yeni çıkılmış olması. Ayırt etmek için alttaki tabloya bak — olay gerçekse birden çok istasyon aynı anda sapar, kesinti artçısıysa sapmalar dağınık olur.",
@@ -1215,7 +922,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 98
+        "y": 68
       },
       "timeFrom": "7d",
       "description": "Hangi istasyonun kaç kez sıra dışı ölçüm verdiği, en çoktan aza sıralı. **En işe yarar panel budur**, çünkü eyleme dönüşür: listenin başında sürekli aynı istasyon varsa o sensörde bir sorun olabilir. \"Yukarı\" sütunu ölçümün beklenenden yüksek, \"Aşağı\" sütunu düşük geldiği anomali sayısıdır. Tek bir istasyonun öne çıkması o istasyona özgüdür; birçok istasyonun aynı gün sapması bölgesel bir olaya işaret eder.",
@@ -1287,6 +994,360 @@
           "format": "table",
           "rawQuery": true,
           "rawSql": "SELECT station_name AS \"Istasyon\", count(*) AS \"Anomali\", count(*) FILTER (WHERE severity = 'CRITICAL') AS \"Kritik\", count(*) FILTER (WHERE actual_aqi > expected_aqi) AS \"Yukari\", count(*) FILTER (WHERE actual_aqi < expected_aqi) AS \"Asagi\", round(avg(deviation_pct),1) AS \"Ort. sapma %\", max(detected_at) AS \"Son anomali\" FROM aqi_anomalies WHERE $__timeFilter(detected_at) GROUP BY 1 ORDER BY 2 DESC"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Verinin gelme süresi (ayrıntı)",
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 78
+      },
+      "panels": [
+        {
+          "id": 8,
+          "type": "stat",
+          "title": "Verinin gelme suresi — medyan (son 24 sa)",
+          "description": "Bir ölçümün istasyonda damgalandığı andan bizim veritabanımıza düştüğü ana kadar geçen **tipik** süre. Normali yaklaşık **35 dakikadır**. Bu sürenin neredeyse tamamı veriyi aldığımız WAQI servisinin kendi yayınlama gecikmesidir; bizim işlememiz ölçüldüğünde 0 saniye çıktı. Yani yüksek değer \"bizim sistem yavaş\" değil, **\"elimizdeki veri bayat\"** demektir. 60 dakikayı geçerse sarı, 120'yi geçerse kırmızı.",
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 0,
+            "y": 79
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT round(percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric, 1) AS \"dakika\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours'"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 60
+                  },
+                  {
+                    "color": "red",
+                    "value": 120
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "title": "Verinin gelme suresi — p95 (son 24 sa)",
+          "description": "Yukarıdakiyle aynı ölçüm, ama **en yavaş yüzde 5'lik dilim**. Medyan tipik durumu, bu ise en kötü durumu gösterir. Normali yaklaşık **100 dakika**; şimdiye kadar ölçülen en yüksek değer 119. 120 dakikayı geçerse sarı, 165'i geçerse kırmızı — 165, sistemin kendini \"bayat\" ilan ettiği 180 dakikaya yaklaştığımız noktadır.",
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 12,
+            "x": 12,
+            "y": 79
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT round(percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric, 1) AS \"dakika\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours'"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 120
+                  },
+                  {
+                    "color": "red",
+                    "value": 165
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Verinin gelme suresi — saatlik p50 / p95",
+          "description": "Yukarıdaki iki değerin saat saat seyri. Okuma biçimi şöyle: iki çizginin **arası açılırsa** sorun genel değil belirli istasyonlardadır; **ikisi birlikte yükselirse** kaynakta ya da hattın tamamında yavaşlama var demektir.",
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 84
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "format": "time_series",
+              "rawQuery": true,
+              "rawSql": "SELECT time_bucket('1 hour', ingested_at) AS \"time\", percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"p50 (dk)\", percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"p95 (dk)\" FROM raw_readings WHERE $__timeFilter(ingested_at) GROUP BY 1 ORDER BY 1"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "min": 0,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 8,
+                "showPoints": "auto"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          }
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Verinin gelme suresi — istasyon bazinda (saatlik medyan)",
+          "description": "Her istasyonun gecikmesi ayrı bir çizgi. Çizgilerin **birlikte** yükselmesi kaynaktan gelir; **tek bir çizginin** diğerlerinden ayrılması o istasyona özgü bir sorundur. Kalabalık gelirse üstteki \"İstasyon\" seçicisinden tek istasyon seçebilirsin.",
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "gridPos": {
+            "h": 9,
+            "w": 24,
+            "x": 0,
+            "y": 93
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "format": "time_series",
+              "rawQuery": true,
+              "rawSql": "SELECT time_bucket('1 hour', ingested_at) AS \"time\", station_name AS metric, percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60) AS \"dakika\" FROM raw_readings WHERE $__timeFilter(ingested_at) AND station_id IN ($istasyon) GROUP BY 1, 2 ORDER BY 1"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "m",
+              "min": 0,
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 0,
+                "showPoints": "never"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 12,
+          "type": "table",
+          "title": "Istasyon bazinda gecikme siralamasi (son 24 sa)",
+          "description": "İstasyonlar en yavaştan en hızlıya sıralı. Hangi istasyona bakacağını bilmiyorsan **önce buraya bak**, sonra üstteki seçiciden o istasyonu seç. \"Ölçüm\" sütunu önemli: az ölçümü olan bir istasyonun ortalaması güvenilmez, ayrıca düşük sayı zaten o istasyonun yeterince veri göndermediği anlamına gelir.",
+          "datasource": {
+            "type": "postgres",
+            "uid": "timescaledb"
+          },
+          "gridPos": {
+            "h": 11,
+            "w": 24,
+            "x": 0,
+            "y": 102
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT station_name AS \"Istasyon\", count(*) AS \"Olcum\", round(percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"p50 (dk)\", round(percentile_cont(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"p95 (dk)\", round(max(EXTRACT(EPOCH FROM (ingested_at - measured_at))/60)::numeric,1) AS \"En yavas (dk)\" FROM raw_readings WHERE ingested_at > now() - interval '24 hours' AND station_id IN ($istasyon) GROUP BY station_name ORDER BY 3 DESC"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "p50 (dk)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "m"
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        {
+                          "color": "green",
+                          "value": null
+                        },
+                        {
+                          "color": "yellow",
+                          "value": 60
+                        },
+                        {
+                          "color": "red",
+                          "value": 120
+                        }
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "p95 (dk)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "m"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "En yavas (dk)"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "m"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "sortBy": [
+              {
+                "displayName": "p50 (dk)",
+                "desc": true
+              }
+            ]
+          }
         }
       ]
     }
