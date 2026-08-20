@@ -8,7 +8,7 @@
   ],
   "timezone": "Europe/Istanbul",
   "schemaVersion": 39,
-  "version": 9,
+  "version": 10,
   "refresh": "1m",
   "time": {
     "from": "now-24h",
@@ -993,6 +993,300 @@
           "format": "table",
           "rawQuery": true,
           "rawSql": "WITH saatler AS (SELECT DISTINCT time_bucket('1 hour', measured_at) AS saat FROM raw_readings WHERE $__timeFilter(measured_at) AND measured_at <= now()), sinirli AS (SELECT saat FROM saatler UNION ALL SELECT time_bucket('1 hour', now() - interval '3 hours')), farklar AS (SELECT saat, lag(saat) OVER (ORDER BY saat) AS onceki FROM sinirli) SELECT onceki AS \"Son veri\", saat AS \"Tekrar baslangic\", EXTRACT(EPOCH FROM (saat - onceki))/3600 AS \"Bosluk (saat)\" FROM farklar WHERE onceki IS NOT NULL AND saat - onceki > interval '1 hour' ORDER BY onceki DESC"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Son anomali ne zaman",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 84
+      },
+      "description": "En son sıra dışı ölçümün üstünden ne kadar geçtiği. **Bu kutu bir sağlık göstergesi DEĞİLDİR** — bilerek renklendirilmedi. Uzun süre anomali çıkmaması iyi haber de olabilir (hava sakin), kötü haber de (tespit bozuk); bu kutu ikisini ayırt edemez. Ölçüldü: veri sorunsuz akarken 32 ve 53 saat boyunca hiç anomali çıkmadığı dönemler oldu. Tespitin çalışıp çalışmadığını üstteki \"Son verinin yaşı\" kutusundan takip et.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "m",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT EXTRACT(EPOCH FROM (now() - max(detected_at)))/60 AS \"dakika\" FROM aqi_anomalies"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Son 24 saatte anomali",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 84
+      },
+      "description": "Son 24 saatte kaç sıra dışı ölçüm işaretlendi. Tipik gün 2–30 arası; bunun çok üstü, ya gerçek bir kirlilik olayı ya da bir veri kesintisinden yeni çıkılmış olduğu anlamına gelir. Kesinti sonrası sayı yapay olarak şişer, çünkü karşılaştırma yapılan geçmiş ortalama bayatlamıştır.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 40
+              },
+              {
+                "color": "orange",
+                "value": 70
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) AS \"anomali\" FROM aqi_anomalies WHERE detected_at > now() - interval '24 hours'"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Gunluk anomali sayisi (siddete gore)",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 89
+      },
+      "timeFrom": "30d",
+      "description": "Gün gün kaç anomali işaretlendiği, şiddetine göre ayrılmış. **WARNING** %30–50 arası sapma, **CRITICAL** %50 üstü. Ani bir sıçrama iki şeyden birini gösterir: gerçek bir hava olayı ya da veri kesintisinden yeni çıkılmış olması. Ayırt etmek için alttaki tabloya bak — olay gerçekse birden çok istasyon aynı anda sapar, kesinti artçısıysa sapmalar dağınık olur.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CRITICAL"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "WARNING"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "yellow"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT time_bucket('1 day', detected_at) AS \"time\", severity AS metric, count(*) AS \"adet\" FROM aqi_anomalies WHERE $__timeFilter(detected_at) GROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "table",
+      "title": "Istasyon bazinda anomali (son 7 gun)",
+      "datasource": {
+        "type": "postgres",
+        "uid": "timescaledb"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 98
+      },
+      "timeFrom": "7d",
+      "description": "Hangi istasyonun kaç kez sıra dışı ölçüm verdiği, en çoktan aza sıralı. **En işe yarar panel budur**, çünkü eyleme dönüşür: listenin başında sürekli aynı istasyon varsa o sensörde bir sorun olabilir. \"Yukarı\" sütunu ölçümün beklenenden yüksek, \"Aşağı\" sütunu düşük geldiği anomali sayısıdır. Tek bir istasyonun öne çıkması o istasyona özgüdür; birçok istasyonun aynı gün sapması bölgesel bir olaya işaret eder.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Kritik"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "text",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 5
+                    },
+                    {
+                      "color": "red",
+                      "value": 10
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Anomali"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT station_name AS \"Istasyon\", count(*) AS \"Anomali\", count(*) FILTER (WHERE severity = 'CRITICAL') AS \"Kritik\", count(*) FILTER (WHERE actual_aqi > expected_aqi) AS \"Yukari\", count(*) FILTER (WHERE actual_aqi < expected_aqi) AS \"Asagi\", round(avg(deviation_pct),1) AS \"Ort. sapma %\", max(detected_at) AS \"Son anomali\" FROM aqi_anomalies WHERE $__timeFilter(detected_at) GROUP BY 1 ORDER BY 2 DESC"
         }
       ]
     }

@@ -131,6 +131,65 @@ Son 30 gunda kac ayri kesinti yasandi. Suresi degil ADEDI olcer: bir sure kisa a
 
 Her kesinti bir satir: en son veri ne zaman geldi, ne zaman tekrar basladi, arada kac saat gecti. En yeniden eskiye siralanir. Bosluk = ardisik iki olcum saati arasinda 1 saatten fazla fark. Kaynak raw_readings; measured_at istasyonun kendi damgasi oldugu icin bu, WAQI'den veri GELMEDIGI donemleri gosterir. Panel zaman seciciden bagimsiz olarak son 30 gune bakar (timeFrom), cunku panonun varsayilan araligi 24 saat ve iki gunluk bir kesinti orada hic gorunmezdi. Devam eden kesintiyi de yakalamak icin seriye now()-3sa eklenir; 3 saat toleransi WAQI'nin kendi yayin gecikmesi (~40 dk medyan) yuzunden sahte bosluk uretmemek icin, ve backend /health'in bayatlama esigiyle ayni.
 
+### [16] Son anomali ne zaman
+
+*stat*
+
+BILEREK RENKSIZ. Bu panelin esikli/renkli olmasi yanlis bir zihinsel model kurar: anomali
+CIKMAMASI iki farkli seyin gostergesi olabilir -- tespit bozuktur ya da hava sakindir --
+ve bu tablo ikisini ayirt EDEMEZ. Olculdu (20.08): veri sorunsuz akarken 07.08 22:56 ->
+09.08 07:18 arasi 32,4 saat ve 09.08 16:36 -> 12.08 15:35 arasi 71 saat hic anomali
+cikmadi (o pencerelerde sirasiyla 649 ve 1315 olcum geldi, yani hat calisiyordu). Bir
+esik konsaydi ya surekli yanlis alarm verirdi ya da (60+ saat gibi) hicbir ise yaramazdi.
+
+COALESCE YOK -- panel 1 ve 13'ten farkli olarak burada bos sonuc DOGRU cevaptir. Oralarda
+NULL "olculemedi"yi gizliyordu; burada hic anomali olmamasi gercekten bilgi yoklugu degil,
+"henuz anomali yok" demek.
+
+Tespitin calisip calismadiginin gostergesi bu panel degil, "Son verinin yasi" kutusudur:
+anomali tespiti Flink job'inin icinde HER OLCUM icin satir ici kosuyor (AnomalySink.java),
+yani olcum akiyorsa tespit de kosuyordur.
+
+### [17] Son 24 saatte anomali
+
+*stat*
+
+Esikler olculmus dagilima gore: gunluk anomali sayisi tipik olarak 2-30 arasinda (07-19.08
+gozlemi). 40 ve 70 esikleri bu bandin ustunu isaretliyor. 18.08'de 79 anomali gorulmustu ve
+bunun 15'i iki gunluk kesintiden sonraki ILK TAM SAATTE cikti -- taban bayatladigi icin
+normal degerler bile sapmis gorundu. Bu yuzden esikler kirmiziya degil turuncuya kadar
+gidiyor: yuksek sayi "hata" degil "bak" demek.
+
+### [18] Gunluk anomali sayisi (siddete gore)
+
+*timeseries*
+
+Yigilmis cubuk; severity Flink tarafinda ayriliyor (WARNING %30-50 sapma, CRITICAL %50
+ustu -- olculen aralik 30,12-183,17). Renkler sabitlendi (WARNING sari, CRITICAL kirmizi)
+cunku Grafana'nin otomatik seri renkleri sorgu sirasina gore degisir ve iki siddet birbirine
+karisirdi.
+
+Eksen detected_at, measured_at DEGIL: soru "ne zaman tespit ettik", "olcum ne zamandi"
+degil. measured_at kullanilsaydi gec gelen satirlar gecmise yazilir ve grafik kendini geriye
+donuk degistirirdi.
+
+timeFrom 30d: panonun varsayilan araligi 24 saat, o pencerede gunluk trend gorunmez.
+
+### [19] Istasyon bazinda anomali (son 7 gun)
+
+*table*
+
+Yukari/Asagi kirilimi ONEMLI ve deviation_pct'ten cikarilamaz -- o sutun ISARETSIZ (olculdu:
+30,12 - 183,17, hepsi pozitif). Yon icin actual_aqi ile expected_aqi karsilastiriliyor.
+Genel dagilim (20.08): 146 yukari / 90 asagi.
+
+Yon bilgisi tani koymaya yariyor: kesinti sonrasi taban bayatlamasi tipik olarak ASAGI
+sapma uretir (eski kirli ortalamaya karsi bugunun temiz havasi olculur), gercek kirlilik
+olayi ise YUKARI. Tek basina kesin degil ama tabloda birlikte okununca ayirt edici.
+
+"Son anomali" sutunu, listenin basindaki istasyonun hala mi sorun cikardigini yoksa gecmiste
+mi kaldigini gosterir.
+
 ## outdoor-airq — Makine
 `dashboards/outdoor-airq-makine.json`
 
